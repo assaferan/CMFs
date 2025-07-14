@@ -71,7 +71,7 @@ def eisenstein_series_basis(level, weight, character=None, precision=10):
     E = EisensteinForms(character,weight)
     E.set_precision(precision)
 
-    return E.eisenstein_series()
+    return E.new_eisenstein_series()
 
 
 def main():

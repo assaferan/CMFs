@@ -16,7 +16,7 @@ intrinsic RealCyclotomicField(n::RngIntElt) -> NumFld
 end intrinsic;
 
 intrinsic  EmbedCharacterField (chi::GrpDrchElt,k::RngIntElt,a::SeqEnum[FldNumElt]:Detail:=0) -> Map
-{ Computes a Hecke-compatible embeding of Q(chi) into the coefficient field Q(f) of a weight k eigenform f of character chi with specified Fourier coefficients (NB: an error may occur if not enough coefficients are provided). }
+{ Computes a Hecke-compatible embedding of Q(chi) into the coefficient field Q(f) of a weight k eigenform f of character chi with specified Fourier coefficients (NB: an error may occur if not enough coefficients are provided). }
     require k gt 0: "Weight must be a positive integer";
     K := NumberField(Universe(a));
     if Degree(chi) eq 1 then return hom<Rationals()->K|>; end if;

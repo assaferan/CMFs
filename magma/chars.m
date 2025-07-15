@@ -183,7 +183,7 @@ intrinsic NumberOfTrivialCharacterOrbits (N::RngIntElt) -> RngIntElt
     return 2^w;
 end intrinsic;
 
-intrinsic IsConjugate (chi1::GrpDrchElt,chi2::GrpDrchElt) -> Boolean
+intrinsic IsConjugate (chi1::GrpDrchElt,chi2::GrpDrchElt) -> BoolElt
 { Returns true if chi1 and chi2 are Galois conjugate Dirichlet characters. }
     e := Order(chi1);
     if Order(chi2) ne e then return false; end if;

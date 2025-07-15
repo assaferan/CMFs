@@ -4,3 +4,31 @@ parallel --joblog Nk2.log magma -b Nk2_min:='{=1 $_=1000*$arg[1]+1 =}' Nk2_max:=
 parallel --joblog weight2.log magma -b N_min:='{=1 $_=1000*$arg[1]+1 =}' N_max:='{=1 $_=1000*($arg[1]+1) =}' magma/aldims_weight_2.m ::: {0..49}
 # N <= 10^6 prime, k = 2
 parallel --joblog prime_levels.log magma -b N_min:='{=1 $_=1000*$arg[1]+1 =}' N_max:='{=1 $_=1000*($arg[1]+1) =}' magma/aldims_weight_2_primes.m ::: {0..999}
+
+
+from lmfdb import db
+from glob import glob
+fnames = glob("../mf_aldims/*")
+logfile = "../mf_aldims/update_table.log"
+log = open(logfile, "w")
+
+for fname in fnames:
+    db.mf_newspaces.update_from_file(fname, sep=':')
+    log.write("updated from" + fname + "\n")
+
+log.close()
+
+def reformat_file(fname):
+    f = open(fname)
+    lines = f.readlines()
+    f.close()
+    types = 'text:integer[]:integer[]:integer[]:integer[]\n'
+    if lines[1] != types:
+        lines = lines[:1] + [types] + lines[1:]
+    if lines[2] != '\n':
+        lines = lines[:2] + ['\n'] + lines[2:]
+    cur = ''.join(lines)
+    cur = cur.replace('[', '{').replace(']','}')
+    f = open(fname, "w")
+    f.write(cur)
+    f.close()

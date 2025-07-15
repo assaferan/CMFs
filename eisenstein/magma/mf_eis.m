@@ -13,7 +13,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
         return strip(s);
     end if;
     if Detail gt 0 then printf "Constructing space %o:%o:%o...", N,k,o; t:=Cputime(); end if;
-    NS := NewSubspace(EisensteinSubspace(ModularSymbols(chi,k,1)));
+    NS := NewSubspace(EisensteinSubspace(ModularSymbols(chi,k,0)));
     if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
     if NumberOfCoefficients eq 0 then
         if N le 1000 then NumberOfCoefficients := 1000; end if;
@@ -83,6 +83,8 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
         if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
     else
         if Detail gt 0 then printf "Computing %o traces for space %o:%o:%o...", n, N,k,o; t:=Cputime(); end if;
+        // This does not compute the constant term for the Eisenstein series with one of the character being trivial
+        // Is there an easy way to figure out which spaces are these?
         F := [*Eigenform(S[i],n+1):i in [1..#S]*];
         T := Sort([<[Integers()|Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F[i],j) : j in [1..n]],i> : i in [1..#F]]);
         if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;

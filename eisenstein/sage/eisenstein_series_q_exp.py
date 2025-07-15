@@ -11,22 +11,72 @@ To run, use the command:
 
 from sage.all import QQ, CyclotomicField, DirichletGroup, EisensteinForms
 from sage.modular.dirichlet import DirichletCharacter
+from lmfdb import db
+from lmfdb.characters.TinyConrey import ConreyCharacter, get_sage_genvalues
 
 
-# Parameters - modify these as needed
-LEVEL = 13        # Level N
 WEIGHT = 3       # Weight k
-
-H = DirichletGroup(13, base_ring=CyclotomicField(4))
-M = H._module
-chi = DirichletCharacter(H, M([3])) # this is character 13.5
-
-CHARACTER = chi # Character (trivial character if None)
 
 # Additional parameters that might be useful
 PRECISION = 20   # Number of terms in q-expansion
 
-def eisenstein_series_basis(level, weight, character=None, precision=10):
+OUTPUT_FILE = f"eisenstein_series_qexp_weight_{WEIGHT}.txt"
+
+def num2letters(n):
+    r"""
+    Convert a number into a string of letters
+    """
+    if n <= 26:
+        return chr(96+n)
+    else:
+        return num2letters(int((n-1)/26))+chr(97+(n-1) % 26)
+
+def create_label(chi_orbit, x):
+    """
+    Create a label for the Eisenstein series based on the character and Galois orbit code.
+
+    Parameters:
+    -----------
+    chi : DirichletCharacter
+        The Dirichlet character associated with the Eisenstein series.
+    galois_orbit_code : str
+        The Galois orbit code for the character.
+
+    Returns:
+    --------
+    str
+        A label string combining the character and Galois orbit code.
+    """
+
+    N,a = chi_orbit.split('.')
+    N = int(N)  # Convert level N to integer
+    k = WEIGHT
+    label = f"{N}.{k}.{a}.E.{x}"
+    return label
+
+def trace_vector(eis_ser, prec=20):
+    """
+    Compute the trace vector of an Eisenstein series.
+
+    Parameters:
+    -----------
+    eis_ser : EisensteinSeries
+        The Eisenstein series for which to compute the trace vector
+
+    Returns:
+    --------
+    list
+        List of coefficients in the trace vector
+
+    Notes:
+    ------
+    This function needs to be implemented using Sage's modular forms
+    functionality.
+    """
+    return [a_i.trace() for a_i in eis_ser[1:prec]]
+
+
+def eisenstein_series_basis(level, weight, character=None, character_orbit=None, precision=10):
     """
     Compute the q-expansion of the basis of Eisenstein series.
 
@@ -62,16 +112,14 @@ def eisenstein_series_basis(level, weight, character=None, precision=10):
     # 3. Computing basis elements
     # 4. Getting q-expansions
 
-    print(f"Computing Eisenstein series basis for:")
-    print(f"  Level: {level}")
-    print(f"  Weight: {weight}")
-    print(f"  Character: {character}")
-    print(f"  Precision: {precision}")
-
     E = EisensteinForms(character,weight)
     E.set_precision(precision)
-
-    return E.new_eisenstein_series()
+    new_eis_ser = E.new_eisenstein_series()
+    trace_vecs = [trace_vector(eis_ser, precision) for eis_ser in new_eis_ser]
+    sorted_trace_with_eis_ser = sorted(zip(trace_vecs, new_eis_ser), key=lambda x: x[0])
+    output = [(create_label(character_orbit, num2letters(i+1)), eis_ser) for i, (_, eis_ser) in enumerate(sorted_trace_with_eis_ser)]
+    output = {label: eis_ser for label, eis_ser in output}
+    return output
 
 
 def main():
@@ -81,17 +129,38 @@ def main():
     print("Eisenstein Series Q-Expansion Generator")
     print("=" * 40)
 
-    # Compute the basis
-    basis = eisenstein_series_basis(LEVEL, WEIGHT, CHARACTER, PRECISION)
+    dirchar_table = db.char_dirichlet
+    query = {
+        'modulus': {'$gte' : 1,  '$lte': 20},
+        'is_primitive' : True,
+            }
+    payload = dirchar_table.search(query=query, projection=['conductor', 'first', 'label', 'order'])
+    output = []
+    for one_dir_char_orbit in payload:
+        conductor = one_dir_char_orbit['conductor']
+        first = one_dir_char_orbit['first']
+        label = one_dir_char_orbit['label']
+        order = one_dir_char_orbit['order']
+        print(f"Conductor: {conductor}, First: {first}, Label: {label}")
+        chi = ConreyCharacter(conductor, first)
+        sage_zeta_order = chi.sage_zeta_order(order)
+        genvalues_for_code = get_sage_genvalues(conductor, order, chi.genvalues, sage_zeta_order)
+        H = DirichletGroup(conductor, base_ring=CyclotomicField(sage_zeta_order))
+        M = H._module
 
-    if basis:
-        print(f"\nBasis of Eisenstein series:")
-        for i, series in enumerate(basis):
-            print(f"E_{i+1}: {series}")
-    else:
-        print("\nNo Eisenstein series computed (implementation needed)")
+        the_string = 'DirichletCharacter(H, M([{}]))'.format(
+                ','.join(str(val) for val in genvalues_for_code))
+        sage_chi = eval(the_string)
 
-    return basis
+
+        eis_ser_label_and_q_exp = eisenstein_series_basis(conductor, WEIGHT, sage_chi, label, PRECISION)
+        output.append(eis_ser_label_and_q_exp)
+
+    with open(OUTPUT_FILE, "w") as f:
+        for eis_ser_dict in output:
+            for label, eis_ser in eis_ser_dict.items():
+                f.write(f"{label},{eis_ser}\n")
+    print(f"Results written to {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

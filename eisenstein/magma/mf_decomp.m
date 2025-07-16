@@ -111,7 +111,7 @@ function EisensteinAdmissibleCharacterPairs(chi, k : IdentifyConjugates := true,
     pairs_up_to_galois := {};
     while #pairs gt 0 do
       pair := Representative(pairs);
-      triple := <pair[1], pair[2], 1>;
+      triple := <pair[1], pair[2], 0>;
       for m in coprime_to_n do
         other := mth_power(pair, m);
         if other in pairs then 
@@ -451,5 +451,101 @@ procedure DecomposeSpaces (outfile,B:TodoFile:="",B0:=0,Quiet:=false,DimensionsO
             end for;
         end for;
     end for;
+    printf "Wrote %o records to %o using %os of CPU time.\n", cnt, outfile, Cputime()-st;
+end procedure;
+
+procedure WriteSpaceData(fp, chi, k, o: CharTable:=AssociativeArray(), ComputeEigenvalues:=true, 
+                                        NumberOfCoefficients:=0, DegreeBound:=0, Detail:=0, Sep := ",", MinTrace := 0)
+    start := Cputime();
+    if o eq 0 then o := CharacterOrbit(chi); end if;
+    N := Modulus(chi);
+    dNS := QDimensionNewEisensteinForms(chi,k);
+    if dNS eq 0 then
+        if Detail gt 0 then printf "The space %o:%o:%o is empty\n",N,k,o; end if;
+        return;
+    end if;
+    if Detail gt 0 then printf "Constructing admissible pairs for space %o:%o:%o...", N,k,o; t:=Cputime(); end if;
+    S := EisensteinAdmissibleCharacterPairs(chi, k);
+    if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
+    /*
+    if NumberOfCoefficients eq 0 then
+        if N le 1000 then NumberOfCoefficients := 1000; end if;
+        if N gt 1000 and N le 4000 then NumberOfCoefficients := 2000; end if;
+        if N gt 4000 and N le 10000 then NumberOfCoefficients := 3000; end if;
+    end if;
+    n := Max([SturmBound(N,k)+1,Floor(30*Sqrt(N)),NumberOfCoefficients]);
+    */
+    n := NumberOfCoefficients;
+    // assert QDimension(S) eq dNS;
+    D := [t[3]: t in S];
+    if Detail gt 0 then printf "dims = %o\n", sprint(D); end if;
+    if DegreeBound eq 0 then DegreeBound := Max(D); end if;
+    if Detail gt 0 then printf "Computing %o traces for space %o:%o:%o...", n, N,k,o; t:=Cputime(); end if;
+    F := [* EisensteinSeries(t[1],t[2],k : Bound := n): t in S *];
+    T := Sort([<[Integers()|Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F[i],j) : j in [1..n]],i> : i in [1..#F]]);
+    if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
+    
+    D := [D[T[i][2]] : i in [1..#T]];  S := [* S[T[i][2]] : i in [1..#T] *];  F := [*F[T[i][2]] : i in [1.. #T]*];
+    T := [T[i][1] : i in [1..#T]];
+    assert #Set(T) eq #T;
+    if Detail gt 1 then printf "Lex sorted traces = %o\n", sprint(T); end if; 
+    // !! TODO - figure out where I can find first !!
+    GalOrb := Sprintf("%o.%o", N, Base26Encode(o-1));
+    prefix := Join([Sprintf("%o", fld) : fld in [* GalOrb, ConreyIndex(chi), k, NumberOfCoefficients *]], Sep);
+    R<x> := PolynomialRing(Rationals());
+    space_strs := [];
+    for i:=1 to #F do
+        if D[i] gt DegreeBound then break; end if;
+        if Detail gt 0 then printf "Computing %o exact Hecke eigenvalues form %o:%o:%o:%o of dimension %o...",n,N,k,o,i,D[i]; t:=Cputime(); end if;
+        K := AbsoluteField(BaseRing(Parent(F[i])));
+        // f,b,a,c,d,pr,m := OptimizedOrderBasis(Eltseq(MinimalPolynomial(K.1)),[Eltseq(K!Coefficient(F[i],j)) : j in [1..n]]:Verbose:=Detail gt 0);
+        assert IsCyclotomic(K);
+        cyc := CyclotomicOrder(K);
+        an := [K!Coefficient(F[i],j) : j in [0..n]];
+        // an_coeffs := [Eltseq(a) : a in an];
+        an_str := "[" cat Join(["[" cat Join([Sprintf("%o", x) : x in Eltseq(a)], ",") cat "]" : a in an], ",") cat "]";
+        traces := [Trace(a) : a in an[MinTrace..#an]]; // !! TODO - note that this has already been computed for n > 0
+        trace_str := "[" cat Join([Sprintf("%o", t) : t in traces],",") cat "]";
+        label := NewformEisensteinLabel(N,k,o,i);
+        suffix := Join([Sprintf("%o", fld) : fld in [* cyc,an_str,trace_str,label *]], Sep);
+        str := Join([prefix, suffix], Sep);
+        Puts(fp,str);
+        Flush(fp);
+        if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
+    end for;
+    return;
+end procedure;
+
+// Note - in terms of data generation, it will be easier to loop on k last
+procedure WriteDataFile(outfile, k_min, k_max, N_min, N_max, lim : Quiet := false, Jobs := 1, JobId := 0, Eigenvalues := true, 
+                                                                   DegBound := 0, MinTrace := 0)
+    if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
+    st := Cputime();
+    n := 0; cnt:=0;
+    fp := Open(outfile,"w");  
+    A := AssociativeArray();  
+    for k in [k_min..k_max] do
+        for N in [N_min..N_max] do
+            if not Quiet then printf "Constructing character orbit table for modulus %o...", N; t:=Cputime(); end if;
+            G, T := CharacterOrbitReps(N:RepTable); A[N] := <G,T>;
+            if not Quiet then printf "took %o secs\n",Cputime()-t; end if;
+            m := #A[N][1];
+            for o in [1..m] do
+                chi := o gt 1 select A[N][1][o] else DirichletGroup(N)!1;
+                n +:= 1;
+                if ((n-JobId) mod Jobs) eq 0 then
+                    if not Quiet then printf "Constructing character orbit table for divisors of modulus %o...", N; t:=Cputime(); end if;
+                    for M in Divisors(N) do if not IsDefined(A,M) then G, T := CharacterOrbitReps(M:RepTable); A[M] := <G,T>; end if; end for;
+                    if not Quiet then printf "took %o secs\n",Cputime()-t; end if;
+                    if not Quiet then printf "\nProcessing space %o:%o:%o with Coeffs=%o, DegBound=%o\n", N,k,o, lim, DegBound; t:=Cputime(); end if;
+                    WriteSpaceData(fp,chi,k,o: CharTable:=A,NumberOfCoefficients:=lim,ComputeEigenvalues:=Eigenvalues,
+                                               DegreeBound := DegBound, Detail:=Quiet select 0 else 1, MinTrace := MinTrace);
+                    if not Quiet then printf "Total time for space %o:%o:%o was %os\n\n", N,k,o,Cputime()-t; end if;
+                    cnt +:= 1;
+                end if;
+            end for;
+        end for;
+    end for;
+    delete fp;
     printf "Wrote %o records to %o using %os of CPU time.\n", cnt, outfile, Cputime()-st;
 end procedure;

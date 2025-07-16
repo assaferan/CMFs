@@ -1,14 +1,54 @@
 import "../../magma/mf.m" : ComputeHeckeCutters, InnerTwistData, SortEmbeddings, IsSelfDual;
 
-function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], DimensionsOnly:=false, ComputeEigenvalues:=false, ComputeTwists:=false, ComputeTraceStats:=false,
-                       NumberOfCoefficients:=0, DegreeBound:=0, EmbeddingPrecision:= 0, Detail:=0, ReturnDecomposition:=false, ComputeCutters:=false, ComputeCharacterValues:=true)
+
+/*
+Format of data is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap
+The data depends on a degree bound (determines forms with exact eigenvalue data, a coefficient count (number of a_n to compute), and a complex precision (for forms without exact eigevnalue data)
+
+N = level, a positive integer
+k = weight, a positive integer (for .m.txt files, k > 1)
+i = character orbit of chi (Galois orbits of Dirichlet characters chi of modulus N are lex-sorted by order and then by trace vectors [tr(chi(n)) for n in [1..N]], taking traces from Q(chi) to Q; the first orbit index is 1, corresponding to the trivial character, the second orbit will correspond to a quadratic character).
+t = time in secs to compute this line of data
+D = sorted list of dimensions [d1,d2,...] of Galois stable subspaces of S_k^{new}(N,chi), ordered by dimension
+T = lex-sorted list of trace vectors [[tr(a_1),...tr(a_n)],...] for Galois conjugacy classes of eigenforms f corresponding to the subspaces listed in D, traces are from the coefficient field of the form down to Q (note that lex-sorting trace vectors sorts subspaces by dimension because tr(a_1)=tr(1) is the degree of the coefficient field)
+A = Atkin-Lehner signs (empty list if chi is not the trivial character (i.e. i=1)) [[<p,sign> for p in Divisors(N)],...], one list of Atkin-Lehner signs for each subspace listed in D.
+F = Hecke field polys [[f0,f1,...,1],...] list of coeffs (constant coeff first), one list for each subspace listed in D of dimension up to the degree bound (currently 20); note that F[n] corresponds to the space D[n] but F may be shorter than D
+C = Hecke cutters [[<p,[g0,g1,...,1]>,...],...] list of minimal lists of coefficients of charpolys g(x) of T_p sufficient to distinguish all the subspaces listed in D up to the degree bound.
+E = Hecke Eigenvalue data [<g,b,n,m,e>,...] list of tuples <g,b,n,m,e> of Hecke eigenvalue data for each subspace listed in D of dimension greater than 1 up to the degree bound where:
+    g is a polredbestified field poly for the coefficient field (should be the same as the corresponding poly in F),
+    b is a basis for the Hecke ring R:=Z[a_n] in terms of the power basis of K:=Q[x]/(f(x)) (a list of lists of rationals),
+    n is an integer that divides the index [O_K:R] of the Hecke ring R in the ring of integers O_K
+    d is a pair that is either <0,[]> or <D,[<p,e>]> giving the discriminant of the Hecke ring and its prime factorization (if known)
+    e is a list of eigenvalues specified in terms of the basis b (list of deg(f) integers for each a_n)
+    x is a pair <u,v> where u is a list of integers generating Z/NZ* and v is a list of values of chi on u in written in the basis b
+    m is the list integer such that teh first m eigenvalues generate the Hecke ring (as a ring)
+cm = list of cm discriminants, one for each subspace listed in D up to the degree bound, 0 indicates non-CM forms (rigorous)
+tw = list of lists of quadruples <b,n,m,i> identifying char orbits m.i of non-trivial inner twists with multiplicity n, b=0,1 indicates proved or not
+pra = list of boolean values (0 or 1) such that pra[i] is 1 if F[i] is the polredabs polynomial for the Hecke field
+zr = list of proportions of zero a_p over primes p < 2^13 (decimal number), one for each subspace
+mm = list of list of moments of normalized a_p over primes p < 2^13 (decimal numbers), one for each subspace
+h = list of trace hashes (linear combination of tr(a_p) over p in [2^12,2^13] mod 2^61-1), one for subspace
+X = list of pairs <u,v> one for each entry in F where u is a list of integers r generating Z/NZ* and v is a list of values of chi on r in power basis defined by corresponding entry in F
+sd = list of booleans, one for each entry in D, indicating whether newform is self dual or not (i.e. a_n are real)
+eap = list of lists of lists of real or complex valued a_p's for p up to the coefficient bound for each embedding of each form where exact eigenvalues have not been computed
+      if character is trivial embedded a_p's will always be real (this is actually the only case currently used)
+
+This format is also documented in https://github.com/JohnCremona/CMFs/blob/master/README.md.
+*/
+
+
+function NewspaceData(chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], DimensionsOnly:=false, ComputeEigenvalues:=false, ComputeTwists:=false, ComputeTraceStats:=false,
+                       NumberOfCoefficients:=0, DegreeBound:=0, EmbeddingPrecision:= 0, Detail:=0, ReturnDecomposition:=false, ComputeCutters:=false, 
+                       ComputeCharacterValues:=true, Timings := true)
     start := Cputime();
     if o eq 0 then o := CharacterOrbit(chi); end if;
     N := Modulus(chi);
     dNS := QDimensionNewEisensteinForms(chi,k);
     if dNS eq 0 then
         if Detail gt 0 then printf "The space %o:%o:%o is empty\n",N,k,o; end if;
-        s := Sprintf("%o:%o:%o:%o:[]", N, k, o, Cputime()-start);
+        s := Sprintf("%o:%o:%o", N, k, o);
+        if Timings then s cat:= Sprintf(":%o", Cputime()-start); end if;
+        s cat:= ":[]";
         if not DimensionsOnly then s cat:= ":[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]"; end if;
         return strip(s);
     end if;
@@ -26,7 +66,11 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
         assert &and[t[1] ge 1:t in TraceHint] and &+[t[1]:t in TraceHint] eq dNS;
         assert #Set([#t:t in TraceHint]) eq 1;
         if #TraceHint eq 1 and DimensionsOnly then
-            return strip(Sprintf("%o:%o:%o:%o:%o:", N, k, o, Cputime()-start, [TraceHint[1][1]]));
+            if Timings then 
+                return strip(Sprintf("%o:%o:%o:%o:%o:", N, k, o, Cputime()-start, [TraceHint[1][1]]));
+            else
+                return strip(Sprintf("%o:%o:%o:%o:", N, k, o, [TraceHint[1][1]]));
+            end if;
         end if;
         TraceHint := Sort(TraceHint);
         if #TraceHint[1] lt n then
@@ -41,7 +85,11 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
             if Detail gt 0 then printf "Checking whether single form in space %o:%o:%o has CM...", N,k,o; t:=Cputime(); end if;
             cm := [<1,SelfTwists([],NS:TraceHint:=TraceHint[1],pBound:=SturmBound(N,k))>];
             if Detail gt 0 then printf "took %o secs.\n", Cputime()-t; printf "CM: %o\n", cm; end if;
-            s := Sprintf("%o:%o:%o:%o:%o:%o:%o:[]:[[]]:[]:%o:[]:[]", N, k, o, Cputime()-start, [dNS], TraceHint, AL, cm);
+            if Timings then
+                s := Sprintf("%o:%o:%o:%o:%o:%o:%o:[]:[[]]:[]:%o:[]:[]", N, k, o, Cputime()-start, [dNS], TraceHint, AL, cm);
+            else
+                s := Sprintf("%o:%o:%o:%o:%o:%o:[]:[[]]:[]:%o:[]:[]", N, k, o, [dNS], TraceHint, AL, cm);
+            end if;
             s cat:= Sprintf(":[]:[]:[]:[]:[%o]:[]",IsSelfDual(chi,dNS,TraceHint,[],NS) select 1 else 0);
             return strip(s);
         end if;
@@ -52,7 +100,10 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     D := [QDimension(S[i]): i in [1..#S]];
     if Detail gt 0 then printf "dims = %o\n", sprint(D); end if;
     if DimensionsOnly then
-        return strip(Sprintf("%o:%o:%o:%o:%o:", N, k, o, Cputime()-start, Sort(D)));
+        if Timings then
+            return strip(Sprintf("%o:%o:%o:%o:%o:", N, k, o, Cputime()-start, Sort(D)));
+        end if;
+        return strip(Sprintf("%o:%o:%o:%o:", N, k, o, Sort(D)));
     end if;
     if DegreeBound eq 0 then DegreeBound := Max(D); end if;
     if #TraceHint gt 0 then
@@ -225,7 +276,11 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
             if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
         end for;
     end if;
-    s := Sprintf("%o:%o:%o:%o:%o", N, k, o, Cputime()-start, D);
+    if Timings then 
+        s := Sprintf("%o:%o:%o:%o:%o", N, k, o, Cputime()-start, D);
+    else
+        s := Sprintf("%o:%o:%o:%o", N, k, o, D);
+    end if;
     s cat:= Sprintf(":%o:%o:%o:%o",T,AL,HF,HC);
     if ComputeEigenvalues then s cat:= Sprintf(":%o:%o:%o:%o",E,cm,it,pra); else s cat:= ":[]:[]:[]:[]"; end if;
     if ComputeTraceStats then s cat:= Sprintf(":%o:%o:%o", Z, M, H); else s cat:= ":[]:[]:[]"; end if;
@@ -235,11 +290,21 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     if ReturnDecomposition then return strip(s),S; else return strip(s); end if;
 end function;
 
+function DimensionData(chi, k, o)
+    N := Modulus(chi);
+    dS := QDimensionCuspForms(chi,k);
+    dNS := QDimensionNewCuspForms(chi,k);
+    dE := QDimensionEisensteinForms(chi,k);
+    dNE := QDimensionNewEisensteinForms(chi,k);
+    s := Sprintf("%o:%o:%o:%o:%o:%o:%o", N, k, o, dS, dNS, dE, dNE);
+    return s;
+end function;
 
 // Decompose spaces S_k(N,chi)^new into Galois stable subspaces for B0 < k^2*N <= B and k > 1.
-procedure DecomposeSpace (outfile,B:TodoFile:="",B0:=0,Quiet:=false,DimensionsOnly:=false,Coeffs:=1000,DegBound:=20,Eigenvalues:=true,Cutters:=true,Twists:=true,
-                          TrivialCharOnly:=false,TraceStats:=false,Precision:=0,Jobs:=1,JobId:=0)
+procedure DecomposeSpace(outfile,B :TodoFile:="",B0:=0,Quiet:=false,DimensionsOnly:=false,Coeffs:=1000,DegBound:=20,Eigenvalues:=true,Cutters:=true,Twists:=true,
+                          TrivialCharOnly:=false,TraceStats:=false,Precision:=0,Jobs:=1,JobId:=0,Timings:=true)
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
+    if Jobs ne 1 then dimfile cat:= Sprintf("_%o",JobId); end if;
     if TodoFile ne "" then
         TodoList := AssociativeArray();
         for s in Split(Read(TodoFile),"\n") do
@@ -254,6 +319,7 @@ procedure DecomposeSpace (outfile,B:TodoFile:="",B0:=0,Quiet:=false,DimensionsOn
     st := Cputime();
     n := 0; cnt:=0;
     fp := Open(outfile,"w");
+    // dim_fp := Open(dimfile, "w");
     A := AssociativeArray();
     for N:=1 to Floor(B/4) do
         if #L gt 0 and not N in L then continue; end if;
@@ -271,18 +337,20 @@ procedure DecomposeSpace (outfile,B:TodoFile:="",B0:=0,Quiet:=false,DimensionsOn
                 n +:= 1;
                 if ((n-JobId) mod Jobs) eq 0 then
                     if DimensionsOnly then
-                        str := NewspaceData(chi,k,o:DimensionsOnly:=true,Detail:=Quiet select 0 else 1);
+                        str := NewspaceData(chi,k,o:DimensionsOnly:=true,Detail:=Quiet select 0 else 1,Timings:=Timings);
                     else
                         // Note that we need character orbit tables even when TrivialCharOnly is set because we may have twists by non-trivial characters (e.g. for CM forms)
                         if not Quiet then printf "Constructing character orbit table for divisors of modulus %o...", N; t:=Cputime(); end if;
                         for M in Divisors(N) do if not IsDefined(A,M) then G, T := CharacterOrbitReps(M:RepTable); A[M] := <G,T>; end if; end for;
                         if not Quiet then printf "took %o secs\n",Cputime()-t; end if;
                         if not Quiet then printf "\nProcessing space %o:%o:%o with Coeffs=%o, DegBound=%o\n", N,k,o, Coeffs, DegBound; t:=Cputime(); end if;
-                        str := NewspaceData(chi,k,o:CharTable:=A,TraceHint:=hint,NumberOfCoefficients:=Coeffs,ComputeEigenvalues:=Eigenvalues,ComputeCutters:=Cutters,EmbeddingPrecision:=Precision,ComputeTwists:=Twists,ComputeTraceStats:=TraceStats,DegreeBound:=DegBound,Detail:=Quiet select 0 else 1);
+                        str := NewspaceData(chi,k,o:CharTable:=A,TraceHint:=hint,NumberOfCoefficients:=Coeffs,ComputeEigenvalues:=Eigenvalues,ComputeCutters:=Cutters,EmbeddingPrecision:=Precision,ComputeTwists:=Twists,ComputeTraceStats:=TraceStats,DegreeBound:=DegBound,Detail:=Quiet select 0 else 1,Timings:=Timings);
                         if not Quiet then printf "Total time for space %o:%o:%o was %os\n\n", N,k,o,Cputime()-t; end if;
                     end if;
                     Puts(fp,str);
                     Flush(fp);
+                    // Puts(dim_fp, DimensionData(chi, k, o));
+                    // Flush(dim_fp);
                     cnt +:= 1;
                 end if;
             end for;

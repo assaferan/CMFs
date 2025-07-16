@@ -15,12 +15,10 @@ from lmfdb import db
 from lmfdb.characters.TinyConrey import ConreyCharacter, get_sage_genvalues
 
 
-WEIGHT = 3       # Weight k
-
 # Additional parameters that might be useful
-PRECISION = 20   # Number of terms in q-expansion
+PRECISION = 10   # Number of terms in q-expansion
 
-OUTPUT_FILE = f"eisenstein_series_qexp_weight_{WEIGHT}.txt"
+OUTPUT_FILE = f"eisenstein_series_qexp_dummy.txt"
 
 def num2letters(n):
     r"""
@@ -31,7 +29,7 @@ def num2letters(n):
     else:
         return num2letters(int((n-1)/26))+chr(97+(n-1) % 26)
 
-def create_label(chi_orbit, x):
+def create_label(chi_orbit,weight, x):
     """
     Create a label for the Eisenstein series based on the character and Galois orbit code.
 
@@ -50,7 +48,7 @@ def create_label(chi_orbit, x):
 
     N,a = chi_orbit.split('.')
     N = int(N)  # Convert level N to integer
-    k = WEIGHT
+    k = weight
     label = f"{N}.{k}.{a}.E.{x}"
     return label
 
@@ -73,10 +71,45 @@ def trace_vector(eis_ser, prec=20):
     This function needs to be implemented using Sage's modular forms
     functionality.
     """
-    return [a_i.trace() for a_i in eis_ser[1:prec]]
+    return [a_i.trace() for a_i in eis_ser[0:prec+1]]
 
 
-def eisenstein_series_basis(level, weight, character=None, character_orbit=None, precision=10):
+def get_coeffs_as_list_of_lists(eis_ser,K, prec=100):
+    """
+    Get the coefficients of the Eisenstein series as a list of lists.
+
+    Parameters:
+    -----------
+    eis_ser : EisensteinSeries
+        The Eisenstein series for which to get coefficients
+    prec : int
+        Number of terms in the q-expansion
+
+    Returns:
+    --------
+    list
+        List of coefficients in the q-expansion
+
+    Notes:
+    ------
+    This function needs to be implemented using Sage's modular forms
+    functionality.
+    """
+    if K.degree() == 1:
+        coeffs = []
+        for i in range(prec+1):
+            coeffs.append([eis_ser[i]])
+
+    coeffs = []
+    for i in range(prec+1):
+        coeff = K(eis_ser[i])
+        coeff_as_vector = coeff.vector()
+        coeffs.append(list(coeff_as_vector))
+    return coeffs
+
+
+
+def eisenstein_series_basis(level, weight, character=None, character_orbit=None, first=None, sage_zeta_order=None, precision=PRECISION, K=None):
     """
     Compute the q-expansion of the basis of Eisenstein series.
 
@@ -113,12 +146,12 @@ def eisenstein_series_basis(level, weight, character=None, character_orbit=None,
     # 4. Getting q-expansions
 
     E = EisensteinForms(character,weight)
-    E.set_precision(precision)
+    E.set_precision(precision+1)
     new_eis_ser = E.new_eisenstein_series()
     trace_vecs = [trace_vector(eis_ser, precision) for eis_ser in new_eis_ser]
     sorted_trace_with_eis_ser = sorted(zip(trace_vecs, new_eis_ser), key=lambda x: x[0])
-    output = [(create_label(character_orbit, num2letters(i+1)), eis_ser) for i, (_, eis_ser) in enumerate(sorted_trace_with_eis_ser)]
-    output = {label: eis_ser for label, eis_ser in output}
+    output = [(create_label(character_orbit, weight, num2letters(i+1)), trace_vec, get_coeffs_as_list_of_lists(eis_ser, K, precision)) for i, (trace_vec, eis_ser) in enumerate(sorted_trace_with_eis_ser)]
+    output = [(character_orbit, first, weight, sage_zeta_order, label, trace_vec, eis_ser) for label, trace_vec, eis_ser in output]
     return output
 
 
@@ -134,32 +167,36 @@ def main():
         'modulus': {'$gte' : 1,  '$lte': 20},
         'is_primitive' : True,
             }
-    payload = dirchar_table.search(query=query, projection=['conductor', 'first', 'label', 'order'])
+    payload = list(dirchar_table.search(query=query, projection=['conductor', 'first', 'label', 'order']))
     output = []
-    for one_dir_char_orbit in payload:
-        conductor = one_dir_char_orbit['conductor']
-        first = one_dir_char_orbit['first']
-        label = one_dir_char_orbit['label']
-        order = one_dir_char_orbit['order']
-        print(f"Conductor: {conductor}, First: {first}, Label: {label}")
-        chi = ConreyCharacter(conductor, first)
-        sage_zeta_order = chi.sage_zeta_order(order)
-        genvalues_for_code = get_sage_genvalues(conductor, order, chi.genvalues, sage_zeta_order)
-        H = DirichletGroup(conductor, base_ring=CyclotomicField(sage_zeta_order))
-        M = H._module
+    for weight in range(3,6):
+        for one_dir_char_orbit in payload:
+            conductor = one_dir_char_orbit['conductor']
+            first = one_dir_char_orbit['first']
+            dirchar_label = one_dir_char_orbit['label']
+            order = one_dir_char_orbit['order']
+            print(f"Conductor: {conductor}, First: {first}, Label: {dirchar_label}")
+            chi = ConreyCharacter(conductor, first)
+            sage_zeta_order = chi.sage_zeta_order(order)
+            genvalues_for_code = get_sage_genvalues(conductor, order, chi.genvalues, sage_zeta_order)
+            K = CyclotomicField(sage_zeta_order)
+            H = DirichletGroup(conductor, base_ring=K)
+            M = H._module
 
-        the_string = 'DirichletCharacter(H, M([{}]))'.format(
-                ','.join(str(val) for val in genvalues_for_code))
-        sage_chi = eval(the_string)
+            the_string = 'DirichletCharacter(H, M([{}]))'.format(
+                    ','.join(str(val) for val in genvalues_for_code))
+            sage_chi = eval(the_string)
 
 
-        eis_ser_label_and_q_exp = eisenstein_series_basis(conductor, WEIGHT, sage_chi, label, PRECISION)
-        output.append(eis_ser_label_and_q_exp)
+            eis_ser_label_and_q_exp = eisenstein_series_basis(conductor, weight, sage_chi, dirchar_label, first, sage_zeta_order, PRECISION, K)
+            output.append(eis_ser_label_and_q_exp)
 
     with open(OUTPUT_FILE, "w") as f:
-        for eis_ser_dict in output:
-            for label, eis_ser in eis_ser_dict.items():
-                f.write(f"{label},{eis_ser}\n")
+        for eis_ser_one_dirchar_list in output:
+            for character_orbit, first, weight, sage_zeta_order, label, trace_vec, eis_ser in eis_ser_one_dirchar_list:
+                f.write(f"{character_orbit},{first},{weight},{PRECISION},{sage_zeta_order}," +
+                        str(eis_ser).replace(' ', '') + "," +
+                        str(trace_vec).replace(' ', '') + f",{label}\n")
     print(f"Results written to {OUTPUT_FILE}")
 
 

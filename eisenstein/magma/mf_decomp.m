@@ -520,6 +520,15 @@ procedure WriteSpaceData(fp, chi, k, o: CharTable:=AssociativeArray(), ComputeEi
     return;
 end procedure;
 
+function MyCharacterOrbitReps(N)
+    conrey := ConreyCharacterOrbitReps(N);
+    T := AssociativeArray();
+    for chi in Elements(FullDirichletGroup(N)) do
+        T[chi] := CharacterOrbit(chi);
+    end for;
+    return [* DirichletCharacter(c) : c in conrey *], T, conrey;
+end function;
+
 // Note - in terms of data generation, it will be easier to loop on k last
 procedure WriteDataFile(outfile, k_min, k_max, N_min, N_max, lim : Quiet := false, Jobs := 1, JobId := 0, Eigenvalues := true, 
                                                                    DegBound := 0, MinTrace := 0)
@@ -531,15 +540,19 @@ procedure WriteDataFile(outfile, k_min, k_max, N_min, N_max, lim : Quiet := fals
     for k in [k_min..k_max] do
         for N in [N_min..N_max] do
             if not Quiet then printf "Constructing character orbit table for modulus %o...", N; t:=Cputime(); end if;
-            G, T := CharacterOrbitReps(N:RepTable); A[N] := <G,T>;
+            // G, T := CharacterOrbitReps(N:RepTable); A[N] := <G,T>;
+            G, T, conrey := MyCharacterOrbitReps(N); A[N] := <G,T>;
             if not Quiet then printf "took %o secs\n",Cputime()-t; end if;
-            m := #A[N][1];
+            // m := #A[N][1];
+            m := #conrey;
             for o in [1..m] do
-                chi := o gt 1 select A[N][1][o] else DirichletGroup(N)!1;
+                // chi := o gt 1 select A[N][1][o] else DirichletGroup(N)!1;
+                chi := DirichletCharacter(conrey[o]);
                 n +:= 1;
                 if ((n-JobId) mod Jobs) eq 0 then
                     if not Quiet then printf "Constructing character orbit table for divisors of modulus %o...", N; t:=Cputime(); end if;
-                    for M in Divisors(N) do if not IsDefined(A,M) then G, T := CharacterOrbitReps(M:RepTable); A[M] := <G,T>; end if; end for;
+                    // for M in Divisors(N) do if not IsDefined(A,M) then G, T := CharacterOrbitReps(M:RepTable); A[M] := <G,T>; end if; end for;
+                    for M in Divisors(N) do if not IsDefined(A,M) then G, T := MyCharacterOrbitReps(M); A[M] := <G,T>; end if; end for;
                     if not Quiet then printf "took %o secs\n",Cputime()-t; end if;
                     if not Quiet then printf "\nProcessing space %o:%o:%o with Coeffs=%o, DegBound=%o\n", N,k,o, lim, DegBound; t:=Cputime(); end if;
                     WriteSpaceData(fp,chi,k,o: CharTable:=A,NumberOfCoefficients:=lim,ComputeEigenvalues:=Eigenvalues,

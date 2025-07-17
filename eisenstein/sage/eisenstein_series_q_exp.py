@@ -17,8 +17,9 @@ from lmfdb.characters.TinyConrey import ConreyCharacter, get_sage_genvalues
 
 # Additional parameters that might be useful
 PRECISION = 10   # Number of terms in q-expansion
-
-OUTPUT_FILE = f"eisenstein_series_qexp_dummy.txt"
+COND_BOUND = 19
+WEIGHTS = [3, 4, 5]  # Weights to consider for Eisenstein series
+OUTPUT_FILE = f"N1_{COND_BOUND}k{WEIGHTS[0]}-{WEIGHTS[-1]}lim{PRECISION}_trace0.sage.txt"
 
 def num2letters(n):
     r"""
@@ -149,7 +150,7 @@ def eisenstein_series_basis(level, weight, character=None, character_orbit=None,
     E.set_precision(precision+1)
     new_eis_ser = E.new_eisenstein_series()
     trace_vecs = [trace_vector(eis_ser, precision) for eis_ser in new_eis_ser]
-    sorted_trace_with_eis_ser = sorted(zip(trace_vecs, new_eis_ser), key=lambda x: x[0])
+    sorted_trace_with_eis_ser = sorted(zip(trace_vecs, new_eis_ser), key=lambda x: x[0][1:])
     output = [(create_label(character_orbit, weight, num2letters(i+1)), trace_vec, get_coeffs_as_list_of_lists(eis_ser, K, precision)) for i, (trace_vec, eis_ser) in enumerate(sorted_trace_with_eis_ser)]
     output = [(character_orbit, first, weight, sage_zeta_order, label, trace_vec, eis_ser) for label, trace_vec, eis_ser in output]
     return output
@@ -164,29 +165,31 @@ def main():
 
     dirchar_table = db.char_dirichlet
     query = {
-        'modulus': {'$gte' : 1,  '$lte': 20},
-        'is_primitive' : True,
+        'modulus': {'$gte' : 1,  '$lte': COND_BOUND}
+        # 'is_primitive' : True,
             }
-    payload = list(dirchar_table.search(query=query, projection=['conductor', 'first', 'label', 'order']))
+    payload = list(dirchar_table.search(query=query, projection=['conductor', 'modulus', 'first', 'label', 'order']))
     output = []
-    for weight in range(3,6):
+    for weight in WEIGHTS:
         for one_dir_char_orbit in payload:
             conductor = one_dir_char_orbit['conductor']
+            modulus = one_dir_char_orbit['modulus']
             first = one_dir_char_orbit['first']
             dirchar_label = one_dir_char_orbit['label']
             order = one_dir_char_orbit['order']
-            print(f"Conductor: {conductor}, First: {first}, Label: {dirchar_label}")
-            chi = ConreyCharacter(conductor, first)
+            print(f"Conductor: {conductor}, Modulus: {modulus}, First: {first}, Label: {dirchar_label}")
+            chi = ConreyCharacter(modulus, first)
             sage_zeta_order = chi.sage_zeta_order(order)
-            genvalues_for_code = get_sage_genvalues(conductor, order, chi.genvalues, sage_zeta_order)
+            genvalues_for_code = get_sage_genvalues(modulus, order, chi.genvalues, sage_zeta_order)
             K = CyclotomicField(sage_zeta_order)
-            H = DirichletGroup(conductor, base_ring=K)
+            H = DirichletGroup(modulus, base_ring=K)
             M = H._module
+            # if modulus == 9 and first == 1:
+            #     import pdb; pdb.set_trace()  # Debugging point
 
             the_string = 'DirichletCharacter(H, M([{}]))'.format(
                     ','.join(str(val) for val in genvalues_for_code))
             sage_chi = eval(the_string)
-
 
             eis_ser_label_and_q_exp = eisenstein_series_basis(conductor, weight, sage_chi, dirchar_label, first, sage_zeta_order, PRECISION, K)
             output.append(eis_ser_label_and_q_exp)

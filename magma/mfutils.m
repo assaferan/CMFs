@@ -82,9 +82,9 @@ intrinsic HeckeOrbitCode (N::RngIntElt,k::RngIntElt,o::RngIntElt,n::RngIntElt : 
     require N lt 2^24: "Level N must be less than 2^24.";
     require k lt 2^12: "Weight k must be less than 2^12.";
     require o lt 2^16: "Char orbit index o must be less than 2^16.";
-    require n lt 2^12: "Hecke oribt index n must be less than 2^11.";
-    eis := Eisenstein select 1 else 0;
-    return N+2^24*k+2^36*(o-1)+2^52*(n-1)+2^63*eis;
+    require n lt 2^12: "Hecke orbit index n must be less than 2^11.";
+    eis := Eisenstein select -1 else 1;
+    return eis*(N+2^24*k+2^36*(o-1)+2^52*(n-1));
 end intrinsic;
 
 // extract Hecke orbit invariants from code

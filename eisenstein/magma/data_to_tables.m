@@ -44,39 +44,18 @@ dim_columns := ["level", "weight", "char_orbit", "dim_cusp", "dim_eis", "dim_cus
 */
 
 // !! TODO - some functions need more data than that
-// format is N:o:[n1,n2,...]:M:pmo:order:deg:parity:is_real (list of conrey chars chi_N(n,*) in orbit o, M=cond, pmo=primitive_orbit_index
+// format is N:o:n:M:pmo:order:deg:parity:is_real (minimal conrey char chi_N(n,*) in orbit o, M=cond, pmo=primitive_orbit_index)
 procedure WriteConreyLabelsFile(outfile, maxN : minN := 1, Quiet := false)
     fp := Open(outfile, "w");
-    A := AssociativeArray();
     for N in [minN..maxN] do
         if not Quiet then printf "Constructing character orbit table for modulus %o...", N; t:=Cputime(); end if;
-        G := FullDirichletGroup(N);
-        orbit_table := AssociativeArray();
-        conductors := AssociativeArray();
-        pmo := AssociativeArray();
-        T := AssociativeArray();
-        orders := AssociativeArray();
-        degs := AssociativeArray();
-        pars := AssociativeArray();
-        is_real := AssociativeArray();
-        for chi in Elements(G) do
-            o := CharacterOrbit(chi);
-            if not IsDefined(orbit_table, o) then orbit_table[o] := []; end if;
-            if not IsDefined(conductors, o) then conductors[o] := Conductor(chi); end if;
-            orbit_table[o] := Append(orbit_table[o], ConreyIndex(chi));
-            if not IsDefined(pmo, o) then 
-                T[chi] := o;
-                M := Conductor(chi);
-                pmo[o] := (M eq N) select o else A[M][AssociatedPrimitiveCharacter(chi)];
-            end if;
-            if not IsDefined(orders, o) then orders[o] := Order(chi); end if;
-            if not IsDefined(degs, o) then degs[o] := Degree(chi); end if;
-            if not IsDefined(pars, o) then pars[o] := Parity(chi); end if;
-            if not IsDefined(is_real, o) then is_real[o] := (IsReal(chi) select 1 else 0); end if;
-        end for;
-        A[N] := T;
-        for o in Sort([k : k in Keys(orbit_table)]) do
-            str := Sprintf("%o:%o:%o:%o:%o:%o:%o:%o:%o", N, o, orbit_table[o], conductors[o], pmo[o],orders[o],degs[o],pars[o],is_real[o]);
+        conrey_labels := ConreyCharacterOrbitReps(N);
+        for o->label in conrey_labels do
+            chi := DirichletCharacter(label);
+            M := Conductor(chi);
+            pmo := CharacterOrbit(AssociatedPrimitiveCharacter(chi));
+            str := Sprintf("%o:%o:%o:%o:%o:%o:%o:%o:%o", N, o, ConreyIndexes(chi), M, pmo, Order(chi), Degree(chi), 
+                                                        Parity(chi),IsReal(chi) select 1 else 0);
             Puts(fp, str);
             Flush(fp);
         end for;

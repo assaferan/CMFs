@@ -1,5 +1,7 @@
 AttachSpec("mf.spec");
 
+import "aldims.m" : ALdimsTraceFormula;
+
 MIN_QEXP_DIGITS := 25;
 MAX_QEXP_DIGITS := 45;
 
@@ -185,7 +187,10 @@ but we want to leave id out
 */
 
 newspaces_columns := [
-<"AL_dims","jsonb">,
+<"ALdims","integer[]">,
+<"ALdims_eis_new", "integer[]">,
+<"ALdims_eis_old", "integer[]">,
+<"ALdims_old", "integer[]">,
 <"Nk2","integer">,
 <"a4_dim","integer">,
 <"a5_dim","integer">,
@@ -198,7 +203,7 @@ newspaces_columns := [
 <"char_order","integer">,
 <"char_parity","smallint">,
 <"char_values","jsonb">,
-<"conrey_indexes","integer[]">,
+<"conrey_index","integer">,
 <"cusp_dim","integer">,
 <"dihedral_dim","integer">,
 <"dim","integer">,
@@ -209,8 +214,10 @@ newspaces_columns := [
 <"hecke_orbit_dims","integer[]">,
 <"label","text">,
 <"level","integer">,
+<"level_is_powerful","boolean">,
 <"level_is_prime","boolean">,
 <"level_is_prime_power","boolean">,
+<"level_is_prime_square","boolean">,
 <"level_is_square","boolean">,
 <"level_is_squarefree","boolean">,
 <"level_primes","integer[]">,
@@ -365,6 +372,8 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         rec["level_is_prime_power"] := (N gt 1 and IsPrimePower(N)) select 1 else 0;
         rec["level_is_square"] := IsSquare(N) select 1 else 0;
         rec["level_is_squarefree"] := IsSquarefree(N) select 1 else 0;
+        rec["level_is_prime_square"] := (sqr and IsPrime(sqrtN) where sqr, sqrtN := IsSquare(N)) select 1 else 0;
+        rec["level_is_powerful"] := (N mod (&*PrimeDivisors(N))^2 eq 0) select 1 else 0;
         rec["level_primes"] := P;
         rec["level_radical"] := prod(P);
         rec["weight"] := k;
@@ -376,7 +385,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         cr := o gt 1 select CT[[N,o]] else <[1],1,1,1,1,1,1>;
         code := HeckeOrbitCode(N,k,o,1 : Eisenstein := Eisenstein);
         rec["hecke_orbit_code"] := code;
-        rec["conrey_indexes"] := cr[1];
+        rec["conrey_index"] := cr[1][1];
         rec["char_conductor"] := cr[2];
         rec["prim_orbit_index"] := cr[3];
         rec["char_order"] := cr[4];
@@ -432,6 +441,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
                 rec["trace_bound"] := trace_bound;
             end if;
             if k gt 1 and o eq 1 and #dims gt 0 then
+                /*
                 AL_signs := eval(r[7]);
                 assert #AL_signs eq #dims;
                 AL_dims := [];
@@ -441,8 +451,15 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
                     ALsub := [dims[i] : i in [1..#dims] | &and[(a[2] eq 1 and a[1] in s) or (a[2] eq -1 and a[1] in t):a in AL_signs[i]]];
                     if #ALsub gt 0 then Append(~AL_dims,<[[p, p in s select 1 else -1]:p in P],sum(ALsub),#ALsub>); end if;
                 end for;
-                rec["AL_dims"] := AL_dims;
-                rec["plus_dim"] := sum([a[2]:a in AL_dims|prod([Integers()|b[2]:b in a[1]]) eq 1]);
+                rec["ALdims"] := AL_dims;
+                */
+                AL_dims := ALdimsTraceFormula(N,k);
+                rec["ALdims"] := AL_dims["cusp_new"];
+                rec["ALdims_old"] := AL_dims["cusp_old"];
+                rec["ALdims_eis_new"] := AL_dims["eis_new"];
+                rec["ALdims_eis_old"] := AL_dims["eis_old"];
+                AL_dims := Eisenstein select rec["ALdims_eis_new"] else rec["ALdims"];
+                rec["plus_dim"] := sum([AL_dims[i] : i in [1..#AL_dims] | IsEven(&+Intseq(i)) ]);
             end if;
             if (#r ge 9) and (num gt 0) then
                 cutters := eval(r[9]);
@@ -613,7 +630,7 @@ newforms_columns := [
 <"char_parity","smallint", true>,
 <"char_values","jsonb",true>,
 <"cm_discs","integer[]", false>,
-<"conrey_indexes","integer[]", true>,
+<"conrey_index","integer", true>,
 <"dim","integer", false>,
 <"embedded_related_objects","text[]", false>,
 <"field_disc","numeric",false>,
@@ -836,6 +853,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         if r[3] eq 1 then assert #r[5] eq #r[7]; end if;
         assert #r[8] eq #r[13];
         N := r[1]; k := r[2]; o := r[3]; dims := r[5];
+        conrey := ConreyCharacterOrbitReps(N);
         rec["Nk2"]:= N*k*k;
         rec["level"] := N;
         rechnf["level"] := N;
@@ -852,22 +870,23 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         rec["char_orbit_index"] := o;
         rechnf["char_orbit_index"] := o;
         rec["analytic_conductor"] := AnalyticConductor(N,k);
-        if o gt 1 and not IsDefined(OT,N) then G,T := CharacterOrbitReps(N:RepTable); OT[N] := <G,T>; end if;
-        chi := o eq 1 select DirichletGroup(N)!1 else OT[N][1][o];
+        // if o gt 1 and not IsDefined(OT,N) then G,T := CharacterOrbitReps(N:RepTable); OT[N] := <G,T>; end if;
+        // chi := o eq 1 select DirichletGroup(N)!1 else OT[N][1][o];
+        chi := DirichletCharacter(conrey[o]);
         M := Conductor(chi);
-        if o gt 1 and not IsDefined(OT,M) then G,T := CharacterOrbitReps(M:RepTable); OT[M] := <G,T>; end if;
+        // if o gt 1 and not IsDefined(OT,M) then G,T := CharacterOrbitReps(M:RepTable); OT[M] := <G,T>; end if;
         rec["char_conductor"] := M;
-        rec["prim_orbit_index"] := o eq 1 select 1 else OT[M][2][AssociatedPrimitiveCharacter(chi)];
+        rec["prim_orbit_index"] := CharacterOrbit(AssociatedPrimitiveCharacter(chi));// o eq 1 select 1 else OT[M][2][AssociatedPrimitiveCharacter(chi)];
         rec["space_label"] := NewspaceLabel(N,k,o);
         rec["char_orbit_label"] := Base26Encode(o-1);
         rec["char_order"] := Order(chi);
         rec["char_is_minimal"] := IsMinimal(chi) select 1 else 0;
         if o gt 1 and not IsDefined(ConreyTable,[N,o]) then
             t := Cputime();
-            ConreyTable[[N,o]] := sprint(ConreyIndexes(chi));
+            ConreyTable[[N,o]] := sprint(ConreyIndex(chi));
             printf "Generating Conrey labels for character orbit %o of modulus %o in %.3os\n", o, N, Cputime()-t;
         end if;
-        rec["conrey_indexes"] := o eq 1 select "[1]" else ConreyTable[[N,o]];
+        rec["conrey_index"] := o eq 1 select "1" else ConreyTable[[N,o]][1];
         rec["char_parity"] := Parity(chi);
         rec["char_is_real"] := IsReal(chi) select 1 else 0;
         rec["char_degree"] := Degree(chi);
@@ -1008,7 +1027,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             if IsDefined(ArtinTable,label) then
                 ar := ArtinTable[label];
                 if #ar[6] gt 0 and ar[6] ne "?" then
-                    L := atoii(ConreyTable[[r[1],r[3]]]);
+                    L := atoi(ConreyTable[[r[1],r[3]]]); // is this used anywhere?
                     arlabels := Split(ar[6],"c");
                     cn := StringToIntegerArray(arlabels[2]); assert #cn eq dim;
                     artin_url := "\"ArtinRepresentation/" cat arlabels[1] cat "\"";
@@ -1558,7 +1577,7 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
     ConreyTable:=AssociativeArray();
     if conrey_labels ne "" then
         start:=Cputime();
-        S := Split(Read(conrey_labels),"\n"); // format is N:o:[n1,n2,...] (list of conrey chars chi_N(n,*) in orbit o for modulus N)
+        S := Split(Read(conrey_labels),"\n"); // format is N:o:n (minimal conrey char chi_N(n,*) in orbit o for modulus N)
         for s in S do r:=Split(s,":"); ConreyTable[[StringToInteger(r[1]),StringToInteger(r[2])]] := StringToIntegerArray(r[3]); end for;
         printf "Loaded %o records from conrey label file %o in %o secs.\n", #Keys(ConreyTable), conrey_labels, Cputime()-start;
     end if;
@@ -1720,7 +1739,7 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
     printf "Wrote %o records to %o in %o secs\n", cnt, outfile, Cputime()-start;
 end procedure;
             
-procedure CreateSubspaceData (outfile, dimfile, conrey_labels: MaxN:=0, Detail:=0, Jobs:=1, JobId:=0)
+procedure CreateSubspaceData (outfile, dimfile, conrey_labels: MaxN:=0, Detail:=0, Jobs:=1, JobId:=0, Eisenstein:=false)
     assert Jobs gt 0 and JobId ge 0 and JobId lt Jobs;
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
     start:=Cputime();
@@ -1733,11 +1752,11 @@ procedure CreateSubspaceData (outfile, dimfile, conrey_labels: MaxN:=0, Detail:=
     delete S;
     CT:=AssociativeArray();  PT := AssociativeArray();
     start:=Cputime();
-    S := Split(Read(conrey_labels),"\n"); // format is N:o:[n1,n2,...]:M:po:ord:deg:parity:isreal (list of conrey chars chi_N(n,*) in orbit o, M=cond, po=primi_orbit_index
+    S := Split(Read(conrey_labels),"\n"); // format is N:o:n:M:po:ord:deg:parity:isreal (minimal conrey char chi_N(n,*) in orbit o, M=cond, po=primi_orbit_index
     for s in S do
         r:=Split(s,":");
-        N := StringToInteger(r[1]); i := StringToInteger(r[2]); clabels := StringToIntegerArray(r[3]); M := StringToInteger(r[4]); h := StringToInteger(r[5]);
-        CT[[N,i]] := <clabels,M,h>;
+        N := StringToInteger(r[1]); i := StringToInteger(r[2]); clabel := StringToInteger(r[3]); M := StringToInteger(r[4]); h := StringToInteger(r[5]);
+        CT[[N,i]] := <clabel,M,h>;
         PT[[M,h,N]] := i;
     end for;
     printf "Loaded %o records from conrey label file %o in %o secs.\n", #Keys(CT), conrey_labels, Cputime()-start;
@@ -1774,7 +1793,7 @@ procedure CreateSubspaceData (outfile, dimfile, conrey_labels: MaxN:=0, Detail:=
                     M := subs[n][1];
                     j := subs[n][2];
                     j_label := Base26Encode(j-1);
-                    sub_label := NewspaceLabel(M,k,j);
+                    sub_label := NewspaceLabel(M,k,j : Eisenstein := Eisenstein);
                     str := strip(Sprintf("%o:%o:%o:%o:%o:%o:%o:%o:%o:%o:%o:%o:%o",
                             label,N,k,i,i_label,curly(sprint(i gt 1 select r[1] else [1])),sub_label,M,j,j_label,curly(sprint(j gt 1 select CT[[M,j]][1] else [1])),dims[n],mults[n]));
                     if Detail gt 0 then print str; end if;

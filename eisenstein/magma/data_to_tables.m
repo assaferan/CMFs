@@ -5,7 +5,7 @@ import "../../magma/mfpgdata.m" : newspaces_columns, gamma1_columns, hecke_trace
 import "../../magma/mfpgdata.m" : FormatNewspaceData, CreateDimensionTableTwo, 
                                   FormatNewformData, FormatHeckeCCData;
 
-import "mf_eis.m" : DecomposeSpace;
+import "../../magma/mf.m" : DecomposeSpace;
 
 input_columns := ["level", "weight", "char_orbit", "time", "dims", "traces", "AL_signs", "hecke_fields",
                   "hecke_cutters", "hecke_ev_data", "cm", "twists", "is_polredabs", "zero_rate", "moments", 
@@ -44,24 +44,43 @@ dim_columns := ["level", "weight", "char_orbit", "dim_cusp", "dim_eis", "dim_cus
 */
 
 // !! TODO - some functions need more data than that
-// format is N:o:[n1,n2,...]:M (list of conrey chars chi_N(n,*) in orbit o, M=cond
-procedure WriteConreyLabelsFile(outfile, maxN : minN := 1)
+// format is N:o:[n1,n2,...]:M:pmo:order:deg:parity:is_real (list of conrey chars chi_N(n,*) in orbit o, M=cond, pmo=primitive_orbit_index
+procedure WriteConreyLabelsFile(outfile, maxN : minN := 1, Quiet := false)
     fp := Open(outfile, "w");
+    A := AssociativeArray();
     for N in [minN..maxN] do
+        if not Quiet then printf "Constructing character orbit table for modulus %o...", N; t:=Cputime(); end if;
         G := FullDirichletGroup(N);
         orbit_table := AssociativeArray();
         conductors := AssociativeArray();
+        pmo := AssociativeArray();
+        T := AssociativeArray();
+        orders := AssociativeArray();
+        degs := AssociativeArray();
+        pars := AssociativeArray();
+        is_real := AssociativeArray();
         for chi in Elements(G) do
             o := CharacterOrbit(chi);
             if not IsDefined(orbit_table, o) then orbit_table[o] := []; end if;
             if not IsDefined(conductors, o) then conductors[o] := Conductor(chi); end if;
             orbit_table[o] := Append(orbit_table[o], ConreyIndex(chi));
+            if not IsDefined(pmo, o) then 
+                T[chi] := o;
+                M := Conductor(chi);
+                pmo[o] := (M eq N) select o else A[M][AssociatedPrimitiveCharacter(chi)];
+            end if;
+            if not IsDefined(orders, o) then orders[o] := Order(chi); end if;
+            if not IsDefined(degs, o) then degs[o] := Degree(chi); end if;
+            if not IsDefined(pars, o) then pars[o] := Parity(chi); end if;
+            if not IsDefined(is_real, o) then is_real[o] := (IsReal(chi) select 1 else 0); end if;
         end for;
+        A[N] := T;
         for o in Sort([k : k in Keys(orbit_table)]) do
-            str := Sprintf("%o:%o:%o:%o", N, o, orbit_table[o], conductors[o]);
+            str := Sprintf("%o:%o:%o:%o:%o:%o:%o:%o:%o", N, o, orbit_table[o], conductors[o], pmo[o],orders[o],degs[o],pars[o],is_real[o]);
             Puts(fp, str);
             Flush(fp);
         end for;
+        if not Quiet then printf "took %o secs\n",Cputime()-t; end if;
     end for;
     delete fp;
     return;
@@ -80,12 +99,12 @@ procedure DoEverythingNk2UpTo(B : folder := "../data/")
     conrey_labels := infile cat "_conrey" cat suffix;
     WriteConreyLabelsFile(conrey_labels, B);
     // DecomposeSpace(infile_dim, B : DimensionsOnly, Timings := false);
-    DecomposeSpace(infile, B);
+    DecomposeSpace(infile, B : Eisenstein);
     // CreateDimensionTable(infile_dim, dimfile);
     CreateDimensionTableTwo(dimfile, B);
     FormatNewspaceData(infile, newspace_outfile, gamma1_outfile, trace_outfile, dimfile : conrey_labels := conrey_labels, Eisenstein);
     FormatNewformData(infile, outfile_prefix, suffix : conrey_labels := conrey_labels, Eisenstein);
-    FormatHeckeCCData(infile, outfile_hecke_cc : Eisenstein);
+    FormatHeckeCCData(infile, outfile_hecke_cc : Eisenstein, conrey_labels := conrey_labels);
     return;
 end procedure;
 

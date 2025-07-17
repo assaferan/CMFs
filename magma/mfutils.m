@@ -63,6 +63,12 @@ intrinsic Gamma1Label(N::RngIntElt,k::RngIntElt) -> MonStgElt
     return Join([IntegerToString(N),IntegerToString(k)],".");
 end intrinsic;
 
+intrinsic Gamma1EisensteinLabel(N::RngIntElt,k::RngIntElt) -> MonStgElt
+{ Given positive integers N,k specifying the level, weight of a space of newforms for Gamma1(N), return the lable of the space. }
+    require N gt 0 and k gt 0: "Inputs to Gamma1Label must be positive integers.";
+    return Join([IntegerToString(N),IntegerToString(k),"E"],".");
+end intrinsic;
+
 intrinsic SplitGamma1Label(s::MonStgElt) -> RngIntElt, RngIntElt
 { Given the label N.k of S_k^new(Gamma1(N)), return the level N, weight k. }
     r := Split(s,".");

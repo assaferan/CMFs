@@ -395,10 +395,10 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         dS := sdims[1];  dE := sdims[2];  dNS := sdims[3]; dNE := sdims[4]; dM:=dS+dE; dNM:= dNS+dNE;
         assert dS ge 0 and dE ge 0 and dNS ge 0 and dNE ge 0;
         if dim ge 0 then assert dim eq (Eisenstein select dNE else dNS); end if;
-        if dNS eq 0 then num := 0; dims :=[]; traces := []; num_traces := 0; straces :=[]; trace_bound := 1; end if;
+        if dim eq 0 then num := 0; dims :=[]; traces := []; num_traces := 0; straces :=[]; trace_bound := 1; end if;
         rec["cusp_dim"] := dS;
-        rec["dim"] := dNS;
-        rec["relative_dim"] := ExactQuotient(dNS,cr[5]);
+        rec["dim"] := dim;
+        rec["relative_dim"] := ExactQuotient(dNE,cr[5]);
         rec["eis_dim"] := dE;
         rec["eis_new_dim"] := dNE;
         rec["mf_dim"] := dM;
@@ -419,7 +419,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
             tcnt +:= 1000;
         end if;
         if num ge 0 then
-            assert dNS eq sum(dims);
+            assert dim eq sum(dims);
             rec["num_forms"] := num;
             rec["hecke_orbit_dims"] := dims;
             trace_bound := 0;
@@ -444,7 +444,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
                 rec["AL_dims"] := AL_dims;
                 rec["plus_dim"] := sum([a[2]:a in AL_dims|prod([Integers()|b[2]:b in a[1]]) eq 1]);
             end if;
-            if #r ge 9 then
+            if (#r ge 9) and (num gt 0) then
                 cutters := eval(r[9]);
                 if #cutters gt 0 then
                     assert #cutters le num; // don't require cutters to be present for every newform
@@ -458,7 +458,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
             assert o eq 1;
             g1N := N; g1k := k; g1sscnt := 1;
             for c in gamma1_columns do g1rec[c[1]] := "\\N"; end for;
-            g1rec["label"] := Sprintf("%o.%o",N,k);
+            g1rec["label"] := Eisenstein select Gamma1EisensteinLabel(N,k) else Gamma1Label(N,k);
             for c in ["level", "level_is_prime", "level_is_prime_power", "level_is_square", "level_is_squarefree", "level_primes", "level_radical", "weight", "weight_parity", "Nk2","analytic_conductor"] do
                 g1rec[c] := rec[c];
             end for;
@@ -483,7 +483,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
             assert g1sscnt eq o; // Verify that we have seen every space
             if k gt 1 then
                 assert DimensionCuspFormsGamma1(N,k) eq g1rec["cusp_dim"];
-                assert DimensionNewCuspFormsGamma1(N,k) eq g1rec["dim"];
+                if not Eisenstein then assert DimensionNewCuspFormsGamma1(N,k) eq g1rec["dim"]; end if;
             end if;
             assert &+g1rec["newspace_dims"] eq g1rec["dim"];
             if non_null([g1rec],"traces") then
@@ -888,7 +888,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             rec["hecke_orbit"] := n;
             rec["dim"] := dim;
             rec["relative_dim"] := ExactQuotient(dims[n],Degree(chi));
-            label := NewformLabel(N,k,o,n);
+            label := Eisenstein select NewformLabel(N,k,o,n) else NewformEisensteinLabel(N,k,o,n);
             rec["label"] := label;
             rechnf["label"] := rec["label"];
             code := HeckeOrbitCode(N,k,o,n : Eisenstein := Eisenstein);

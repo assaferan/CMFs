@@ -37,8 +37,8 @@ This format is also documented in https://github.com/JohnCremona/CMFs/blob/maste
 */
 
 
-function NewspaceData(chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], DimensionsOnly:=false, ComputeEigenvalues:=false, ComputeTwists:=false, ComputeTraceStats:=false,
-                       NumberOfCoefficients:=0, DegreeBound:=0, EmbeddingPrecision:= 0, Detail:=0, ReturnDecomposition:=false, ComputeCutters:=false, 
+function NewspaceData(chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], DimensionsOnly:=false, ComputeEigenvalues:=false, ComputeTwists:=true, ComputeTraceStats:=false,
+                       NumberOfCoefficients:=0, DegreeBound:=0, EmbeddingPrecision:= 0, Detail:=0, ReturnDecomposition:=false, ComputeCutters:=true, 
                        ComputeCharacterValues:=true, Timings := true)
     start := Cputime();
     if o eq 0 then o := CharacterOrbit(chi); end if;
@@ -285,7 +285,7 @@ function NewspaceData(chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], D
     if ComputeEigenvalues then s cat:= Sprintf(":%o:%o:%o:%o",E,cm,it,pra); else s cat:= ":[]:[]:[]:[]"; end if;
     if ComputeTraceStats then s cat:= Sprintf(":%o:%o:%o", Z, M, H); else s cat:= ":[]:[]:[]"; end if;
     s cat:= Sprintf(":%o",X);
-    if ComputeEigenvalues then s cat:= Sprintf(":%o",[IsSelfDual(chi,D[i],T[i],#HF ge i select HF[i] else [],S[i]) select 1 else 0:i in [1..#D]]); else s cat:= ":[]"; end if;
+    if ComputeEigenvalues then s cat:= Sprintf(":%o",[IsSelfDual(chi,D[i],T[i],#HF ge i select HF[i] else [],S[i] : Eisenstein) select 1 else 0:i in [1..#D]]); else s cat:= ":[]"; end if;
     s cat:= Sprintf(":%o",eap);
     if ReturnDecomposition then return strip(s),S; else return strip(s); end if;
 end function;
@@ -301,7 +301,7 @@ function DimensionData(chi, k, o)
 end function;
 
 // Decompose spaces S_k(N,chi)^new into Galois stable subspaces for B0 < k^2*N <= B and k > 1.
-procedure DecomposeSpace(outfile,B :TodoFile:="",B0:=0,Quiet:=false,DimensionsOnly:=false,Coeffs:=1000,DegBound:=20,Eigenvalues:=true,Cutters:=false,Twists:=false,
+procedure DecomposeSpace(outfile,B :TodoFile:="",B0:=0,Quiet:=false,DimensionsOnly:=false,Coeffs:=1000,DegBound:=20,Eigenvalues:=true,Cutters:=true,Twists:=true,
                           TrivialCharOnly:=false,TraceStats:=false,Precision:=0,Jobs:=1,JobId:=0,Timings:=true)
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
     if Jobs ne 1 then dimfile cat:= Sprintf("_%o",JobId); end if;

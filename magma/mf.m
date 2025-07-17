@@ -105,9 +105,9 @@ function MinimizeHeckeCutters (HC)
 end function; */
 
 // Determines whether newform of character chi, dimension d, with rational traces t and Hecke field defined by f for modular symbol space S is self dual or not
-function IsSelfDual (chi,d,t,f,S)
+function IsSelfDual (chi,d,t,f,S : Eisenstein := false)
     // trivial character -> totally real coeff field -> self dual (see Ribet's Galreps attached to eigenforms with nebentypus in Antwerp V, Prop 3.2)
-    if Order(chi) eq 1 then return true; end if;
+    if (not Eisenstein) and (Order(chi) eq 1) then return true; end if;
     // Otherwise the coeff field is totally imaginary unless the char_order is 2 and chi(p)a_p=a_p for all p
     if Order(chi) gt 2 then return false; end if;
     // if the coeff field has odd degree then it is totally real because it cannot be a cm field (by Ribet Prop 3.2)
@@ -212,19 +212,21 @@ This format is also documented in https://github.com/JohnCremona/CMFs/blob/maste
 */
 
 function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], DimensionsOnly:=false, ComputeEigenvalues:=false, ComputeTwists:=false, ComputeTraceStats:=false,
-                       NumberOfCoefficients:=0, DegreeBound:=0, EmbeddingPrecision:= 0, Detail:=0, ReturnDecomposition:=false, ComputeCutters:=false, ComputeCharacterValues:=true)
+                       NumberOfCoefficients:=0, DegreeBound:=0, EmbeddingPrecision:= 0, Detail:=0, ReturnDecomposition:=false, ComputeCutters:=false, ComputeCharacterValues:=true,
+                       Eisenstein := false)
     start := Cputime();
     if o eq 0 then o := CharacterOrbit(chi); end if;
     N := Modulus(chi);
-    dNS := QDimensionNewCuspForms(chi,k);
-    if dNS eq 0 then
+    dNS := Eisenstein select QDimensionNewEisensteinForms(chi,k) else QDimensionNewCuspForms(chi,k);
+    if dNS eq 0 then 
         if Detail gt 0 then printf "The space %o:%o:%o is empty\n",N,k,o; end if;
         s := Sprintf("%o:%o:%o:%o:[]", N, k, o, Cputime()-start);
         if not DimensionsOnly then s cat:= ":[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]:[]"; end if;
         return strip(s);
     end if;
     if Detail gt 0 then printf "Constructing space %o:%o:%o...", N,k,o; t:=Cputime(); end if;
-    NS := NewSubspace(CuspidalSubspace(ModularSymbols(chi,k,-1)));
+    NS := Eisenstein select NewSubspace(EisensteinSubspace(ModularSymbols(chi,k,0))) else
+                            NewSubspace(CuspidalSubspace(ModularSymbols(chi,k,-1)));
     if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
     if NumberOfCoefficients eq 0 then
         if N le 1000 then NumberOfCoefficients := 1000; end if;
@@ -253,7 +255,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
             cm := [<1,SelfTwists([],NS:TraceHint:=TraceHint[1],pBound:=SturmBound(N,k))>];
             if Detail gt 0 then printf "took %o secs.\n", Cputime()-t; printf "CM: %o\n", cm; end if;
             s := Sprintf("%o:%o:%o:%o:%o:%o:%o:[]:[[]]:[]:%o:[]:[]", N, k, o, Cputime()-start, [dNS], TraceHint, AL, cm);
-            s cat:= Sprintf(":[]:[]:[]:[]:[%o]:[]",IsSelfDual(chi,dNS,TraceHint,[],NS) select 1 else 0);
+            s cat:= Sprintf(":[]:[]:[]:[]:[%o]:[]",IsSelfDual(chi,dNS,TraceHint,[],NS : Eisenstein := Eisenstein) select 1 else 0);
             return strip(s);
         end if;
     end if;
@@ -439,7 +441,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     if ComputeEigenvalues then s cat:= Sprintf(":%o:%o:%o:%o",E,cm,it,pra); else s cat:= ":[]:[]:[]:[]"; end if;
     if ComputeTraceStats then s cat:= Sprintf(":%o:%o:%o", Z, M, H); else s cat:= ":[]:[]:[]"; end if;
     s cat:= Sprintf(":%o",X);
-    if ComputeEigenvalues then s cat:= Sprintf(":%o",[IsSelfDual(chi,D[i],T[i],#HF ge i select HF[i] else [],S[i]) select 1 else 0:i in [1..#D]]); else s cat:= ":[]"; end if;
+    if ComputeEigenvalues then s cat:= Sprintf(":%o",[IsSelfDual(chi,D[i],T[i],#HF ge i select HF[i] else [],S[i] : Eisenstein := Eisenstein) select 1 else 0:i in [1..#D]]); else s cat:= ":[]"; end if;
     s cat:= Sprintf(":%o",eap);
     if ReturnDecomposition then return strip(s),S; else return strip(s); end if;
 end function;
@@ -750,7 +752,7 @@ end procedure;
 
 // Decompose spaces S_k(N,chi)^new into Galois stable subspaces for B0 < k^2*N <= B and k > 1.
 procedure DecomposeSpace (outfile,B:TodoFile:="",B0:=0,Quiet:=false,DimensionsOnly:=false,Coeffs:=1000,DegBound:=20,Eigenvalues:=true,Cutters:=true,Twists:=true,
-                          TrivialCharOnly:=false,TraceStats:=false,Precision:=0,Jobs:=1,JobId:=0)
+                          TrivialCharOnly:=false,TraceStats:=false,Precision:=0,Jobs:=1,JobId:=0,Eisenstein:=false)
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
     if TodoFile ne "" then
         TodoList := AssociativeArray();
@@ -783,14 +785,14 @@ procedure DecomposeSpace (outfile,B:TodoFile:="",B0:=0,Quiet:=false,DimensionsOn
                 n +:= 1;
                 if ((n-JobId) mod Jobs) eq 0 then
                     if DimensionsOnly then
-                        str := NewspaceData(chi,k,o:DimensionsOnly:=true,Detail:=Quiet select 0 else 1);
+                        str := NewspaceData(chi,k,o:DimensionsOnly:=true,Detail:=Quiet select 0 else 1, Eisenstein:=Eisenstein);
                     else
                         // Note that we need character orbit tables even when TrivialCharOnly is set because we may have twists by non-trivial characters (e.g. for CM forms)
                         if not Quiet then printf "Constructing character orbit table for divisors of modulus %o...", N; t:=Cputime(); end if;
                         for M in Divisors(N) do if not IsDefined(A,M) then G, T := CharacterOrbitReps(M:RepTable); A[M] := <G,T>; end if; end for;
                         if not Quiet then printf "took %o secs\n",Cputime()-t; end if;
                         if not Quiet then printf "\nProcessing space %o:%o:%o with Coeffs=%o, DegBound=%o\n", N,k,o, Coeffs, DegBound; t:=Cputime(); end if;
-                        str := NewspaceData(chi,k,o:CharTable:=A,TraceHint:=hint,NumberOfCoefficients:=Coeffs,ComputeEigenvalues:=Eigenvalues,ComputeCutters:=Cutters,EmbeddingPrecision:=Precision,ComputeTwists:=Twists,ComputeTraceStats:=TraceStats,DegreeBound:=DegBound,Detail:=Quiet select 0 else 1);
+                        str := NewspaceData(chi,k,o:CharTable:=A,TraceHint:=hint,NumberOfCoefficients:=Coeffs,ComputeEigenvalues:=Eigenvalues,ComputeCutters:=Cutters,EmbeddingPrecision:=Precision,ComputeTwists:=Twists,ComputeTraceStats:=TraceStats,DegreeBound:=DegBound,Detail:=Quiet select 0 else 1,Eisenstein:=Eisenstein);
                         if not Quiet then printf "Total time for space %o:%o:%o was %os\n\n", N,k,o,Cputime()-t; end if;
                     end if;
                     Puts(fp,str);

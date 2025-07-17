@@ -87,16 +87,16 @@ procedure WriteConreyLabelsFile(outfile, maxN : minN := 1, Quiet := false)
 end procedure;
 
 procedure DoEverythingNk2UpTo(B : folder := "../data/")
-    infile := folder cat "Nk2B";
+    infile := folder cat "Nk2_";
     infile_dim := infile cat "dim_only";
     dimfile := infile cat "dim";
-    suffix := ".m.txt";
-    newspace_outfile := infile cat "newspace" cat suffix;
-    gamma1_outfile := infile cat "gamma1" cat suffix;
-    trace_outfile := infile cat "hecke_traces" cat suffix;
-    outfile_prefix := folder cat "Nk2B";
-    outfile_hecke_cc := outfile_prefix cat "hecke_cc";
-    conrey_labels := infile cat "_conrey" cat suffix;
+    suffix := Sprintf("%o.m.txt", B);
+    newspace_outfile := infile cat "mf_newspaces_" cat suffix;
+    gamma1_outfile := infile cat "mf_gamma1_" cat suffix;
+    trace_outfile := infile cat "mf_hecke_traces_" cat suffix;
+    outfile_prefix := folder cat "Nk2_";
+    outfile_hecke_cc := outfile_prefix cat "mf_hecke_cc_" cat suffix;
+    conrey_labels := infile cat "conrey_" cat suffix;
     WriteConreyLabelsFile(conrey_labels, B);
     // DecomposeSpace(infile_dim, B : DimensionsOnly, Timings := false);
     DecomposeSpace(infile, B : Eisenstein);

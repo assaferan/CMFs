@@ -501,10 +501,14 @@ procedure WriteSpaceData(fp, chi, k, o: CharTable:=AssociativeArray(), ComputeEi
         // f,b,a,c,d,pr,m := OptimizedOrderBasis(Eltseq(MinimalPolynomial(K.1)),[Eltseq(K!Coefficient(F[i],j)) : j in [1..n]]:Verbose:=Detail gt 0);
         assert IsCyclotomic(K);
         cyc := CyclotomicOrder(K);
+        if IsOdd(cyc) then 
+            cyc *:= 2;
+            K := CyclotomicField(cyc);
+        end if;
         an := [K!Coefficient(F[i],j) : j in [0..n]];
         // an_coeffs := [Eltseq(a) : a in an];
         an_str := "[" cat Join(["[" cat Join([Sprintf("%o", x) : x in Eltseq(a)], ",") cat "]" : a in an], ",") cat "]";
-        traces := [Trace(a) : a in an[MinTrace..#an]]; // !! TODO - note that this has already been computed for n > 0
+        traces := [Trace(a) : a in an[MinTrace+1..#an]]; // !! TODO - note that this has already been computed for n > 0
         trace_str := "[" cat Join([Sprintf("%o", t) : t in traces],",") cat "]";
         label := NewformEisensteinLabel(N,k,o,i);
         suffix := Join([Sprintf("%o", fld) : fld in [* cyc,an_str,trace_str,label *]], Sep);

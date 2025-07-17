@@ -278,7 +278,8 @@ function non_null (recs,c) return &and[Type(rec[c]) ne MonStgElt : rec in recs];
 //     traces is either a list or list of lists of at least 1000 integer traces, and cutter data is a list of primes (this may change)
 //     if dims is a list, sum(dims) is the dimension of the space, and if traces is a list, sum(traces) gives the traces of the space
 // hecke_fields,AL_signs,cutters are optional and as in mfdata
-procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_outfile, dimfile: conrey_labels:="", wt1_dims:="", Detail:=0, Jobs:=1, JobId:=0,SplitInput:=false)
+procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_outfile, dimfile: 
+                              conrey_labels:="", wt1_dims:="", Detail:=0, Jobs:=1, JobId:=0,SplitInput:=false,Eisenstein:=false)
     assert Jobs gt 0 and JobId ge 0 and JobId lt Jobs;
     if Jobs ne 1 then jobext := Sprintf("_%o",JobId); newspace_outfile cat:= jobext; gamma1_outfile cat:= jobext; trace_outfile cat:= jobext; end if;
     start:=Cputime();
@@ -306,7 +307,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         CTN := [];
         for r in S do
             key := [StringToInteger(r[1]),StringToInteger(r[2])];
-            CT[key] := <StringToIntegerArray(r[3])> cat <StringToInteger(r[i]):i in [4..9]>;
+            CT[key] := <StringToIntegerArray(r[3])> cat <StringToInteger(r[i]):i in [4..#r]>;
             if key[1] eq #CTN then assert key[2] eq CTN[key[1]]+1; CTN[key[1]] +:= 1; else assert key[1] eq #CTN+1 and key[2] eq 1; CTN[key[1]] := 1; end if;
         end for;
         printf "Loaded %o records from conrey label file %o in %o secs.\n", #Keys(CT), conrey_labels, Cputime()-start;
@@ -357,7 +358,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
             traces := -1; straces := -1; num_traces := -1;
         end if;
         P := PrimeDivisors(N);
-        label := NewspaceLabel(N,k,o);
+        label := Eisenstein select NewspaceEisensteinLabel(N,k,o) else NewspaceLabel(N,k,o);
         rec["label"] := label;
         rec["level"] := N;
         rec["level_is_prime"] := IsPrime(N) select 1 else 0;
@@ -373,7 +374,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         rec["char_orbit_index"] := o;
         rec["char_orbit_label"] := Base26Encode(o-1);
         cr := o gt 1 select CT[[N,o]] else <[1],1,1,1,1,1,1>;
-        code := HeckeOrbitCode(N,k,o,1);
+        code := HeckeOrbitCode(N,k,o,1 : Eisenstein := Eisenstein);
         rec["hecke_orbit_code"] := code;
         rec["conrey_indexes"] := cr[1];
         rec["char_conductor"] := cr[2];
@@ -393,7 +394,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         sdims := DT[[N,k,o]];
         dS := sdims[1];  dE := sdims[2];  dNS := sdims[3]; dNE := sdims[4]; dM:=dS+dE; dNM:= dNS+dNE;
         assert dS ge 0 and dE ge 0 and dNS ge 0 and dNE ge 0;
-        if dim ge 0 then assert dim eq dNS; end if;
+        if dim ge 0 then assert dim eq (Eisenstein select dNE else dNS); end if;
         if dNS eq 0 then num := 0; dims :=[]; traces := []; num_traces := 0; straces :=[]; trace_bound := 1; end if;
         rec["cusp_dim"] := dS;
         rec["dim"] := dNS;
@@ -729,7 +730,9 @@ hecke_lpolys_columns := [
 19) eap = list of lists of lists of embedded ap's, one for each subspace in D of dimension greater than the degree bound; for trivial character these are lists of real numbers, otherwise lists of pairs of real numbers encoding real and imaginary parts (the latter 0 if a_n is real).  For each subspace of dimension d there are d lists of embedded ap's [a_2,a_3,...]
 */
 
-procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, Jobs:=1, JobId:=0, conrey_labels:="", artin_reps:="", SplitInput:=false)
+procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, Jobs:=1, JobId:=0, 
+                             conrey_labels:="", artin_reps:="", SplitInput:=false, Eisenstein := false, 
+                             nf_labels := "", rank_table := "", inner_twists := "", minimal_twists := "", related_objects := "")
     assert Jobs gt 0 and JobId ge 0 and JobId lt Jobs;
     if not "." in outfile_suffix then outfile_suffix cat:= ".txt"; end if;
     if Jobs ne 1 then outfile_suffix cat:= Sprintf("_%o",JobId); end if;
@@ -746,15 +749,23 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
     end if;
     start:=Cputime();
     R<x>:=PolynomialRing(Integers());
-    S:=Split(Read("lmfdb_nf_labels.txt"));  // format is coeffs:label
     FieldTable:=AssociativeArray();
-    for s in S do r:=Split(s,":"); FieldTable[eval(r[1])]:= r[2]; end for;
-    printf "Loaded %o records from lmfdb_nf_labels.txt in %o secs.\n", #Keys(FieldTable), Cputime()-start;
-    RankTable:=AssociativeArray();  start := Cputime();
-    b,S := ReadTest("mf_ranks.txt");  // format is label:rank:proved
-    if b then
-        for s in Split(S) do r:=Split(s,":"); RankTable[r[1]]:= [StringToInteger(r[2]),StringToInteger(r[3])]; end for;
-        printf "Loaded %o records from mf_ranks.txt in %o secs.\n", #Keys(RankTable), Cputime()-start;
+    if nf_labels ne "" then
+        // S:=Split(Read("lmfdb_nf_labels.txt"));  // format is coeffs:label
+        S:=Split(Read(nf_labels)); 
+        for s in S do r:=Split(s,":"); FieldTable[eval(r[1])]:= r[2]; end for;
+        printf "Loaded %o records from %o in %o secs.\n", nf_labels, #Keys(FieldTable), Cputime()-start;
+    end if;
+    
+    RankTable:=AssociativeArray();  
+    if rank_table ne "" then
+        start := Cputime();
+        // b,S := ReadTest("mf_ranks.txt");  // format is label:rank:proved
+        b,S := ReadTest(rank_table); 
+        if b then
+            for s in Split(S) do r:=Split(s,":"); RankTable[r[1]]:= [StringToInteger(r[2]),StringToInteger(r[3])]; end for;
+            printf "Loaded %o records from %o in %o secs.\n", rank_table, #Keys(RankTable), Cputime()-start;
+        end if;
     end if;
     ArtinTable:=AssociativeArray();  start := Cputime();
     if artin_reps ne "" then
@@ -763,22 +774,31 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         printf "Loaded %o records from Artin rep file %o in %o secs.\n", #Keys(ArtinTable), artin_reps, Cputime()-start;
     end if;
     InnerTwistTable := AssociativeArray();  start := Cputime();
-    b,S := ReadTest("mftwists_inner.txt");   // format is source:target:chars:mults (ignore records with source != target)
-    if b then
-        for s in Split(S) do r:=Split(s,":"); if r[1] eq r[2] then InnerTwistTable[r[1]] := [r[3],r[4],r[5]]; end if; end for;
-        printf "Loaded %o records from mftwists_inner.txt in %o secs.\n", #Keys(InnerTwistTable), Cputime()-start;
+    if inner_twists ne "" then
+        // b,S := ReadTest("mftwists_inner.txt");   // format is source:target:chars:mults (ignore records with source != target)
+        b,S := ReadTest(inner_twists); 
+        if b then
+            for s in Split(S) do r:=Split(s,":"); if r[1] eq r[2] then InnerTwistTable[r[1]] := [r[3],r[4],r[5]]; end if; end for;
+            printf "Loaded %o records from %o in %o secs.\n", inner_twists, #Keys(InnerTwistTable), Cputime()-start;
+        end if;
     end if;
     MinimalTwistTable := AssociativeArray();  start := Cputime();
-    b,S := ReadTest("mftwists_minimal.txt");  // format is source:target
-    if b then
-        for s in Split(S) do r:=Split(s,":"); MinimalTwistTable[r[2]] := r[1]; end for;
-        printf "Loaded %o records from mftwists_minimal.txt in %o secs.\n", #Keys(MinimalTwistTable), Cputime()-start;
+    if minimal_twists ne "" then 
+        // b,S := ReadTest("mftwists_minimal.txt");  // format is source:target
+         b,S := ReadTest(minimal_twists); 
+        if b then
+            for s in Split(S) do r:=Split(s,":"); MinimalTwistTable[r[2]] := r[1]; end for;
+            printf "Loaded %o records from %o in %o secs.\n", minimal_twists, #Keys(MinimalTwistTable), Cputime()-start;
+        end if;
     end if;
     RelatedObjects:=AssociativeArray();  start := Cputime();
-    b,S := ReadTest("mf_related_objects.txt");  // format is label:URL
-    if b then
-        for s in Split(S) do r:=Split(s,":"); if IsDefined(RelatedObjects,r[1]) then Append(~RelatedObjects[r[1]],r[2]); else RelatedObjects[r[1]] := [r[2]]; end if; end for;
-        printf "Loaded %o records from mf_related_objects.txt in %o secs.\n", #Keys(RelatedObjects), Cputime()-start;
+    if related_objects ne "" then 
+        // b,S := ReadTest("mf_related_objects.txt");  // format is label:URL
+         b,S := ReadTest(related_objects);
+        if b then
+            for s in Split(S) do r:=Split(s,":"); if IsDefined(RelatedObjects,r[1]) then Append(~RelatedObjects[r[1]],r[2]); else RelatedObjects[r[1]] := [r[2]]; end if; end for;
+            printf "Loaded %o records from %o in %o secs.\n", related_objects, #Keys(RelatedObjects), Cputime()-start;
+        end if;
     end if;
     start := Cputime();
     if SplitInput then infile cat:= Sprintf("_%o",JobId); end if;
@@ -871,7 +891,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             label := NewformLabel(N,k,o,n);
             rec["label"] := label;
             rechnf["label"] := rec["label"];
-            code := HeckeOrbitCode(N,k,o,n);
+            code := HeckeOrbitCode(N,k,o,n : Eisenstein := Eisenstein);
             rec["hecke_orbit_code"] := code;
             rechnf["hecke_orbit_code"] := code;
             rec["trace_display"] := [r[6][n][2],r[6][n][3],r[6][n][5],r[6][n][7]];
@@ -1531,7 +1551,8 @@ hecke_cc_columns := [
 <"weight","smallint">
 ];
 
-procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBound:=0, Detail:=0, Jobs:=1, JobId:=0, conrey_labels:= "", ap_only:=false, SplitInput:=false)
+procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBound:=0, Detail:=0, 
+                            Jobs:=1, JobId:=0, conrey_labels:= "", ap_only:=false, SplitInput:=false, Eisenstein := false)
     assert Jobs gt 0 and JobId ge 0 and JobId lt Jobs;
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
     ConreyTable:=AssociativeArray();
@@ -1591,7 +1612,7 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 break;
             end if;
             rec["hecke_orbit"] := i;
-            rec["hecke_orbit_code"] := HeckeOrbitCode(N,k,o,i);
+            rec["hecke_orbit_code"] := HeckeOrbitCode(N,k,o,i : Eisenstein := Eisenstein);
             d := dims[i];
             cd := Degree(chi); rd := ExactQuotient(d,cd);
             if i le off2 then

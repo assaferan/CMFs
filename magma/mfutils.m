@@ -40,6 +40,12 @@ intrinsic NewspaceLabel(N::RngIntElt,k::RngIntElt,o::RngIntElt) -> MonStgElt
     return Join([IntegerToString(N),IntegerToString(k),Base26Encode(o-1)],".");
 end intrinsic;
 
+intrinsic NewspaceEisensteinLabel(N::RngIntElt,k::RngIntElt,o::RngIntElt) -> MonStgElt
+{ Given positive integers N,k,a specifying the level, weight, char orbit of a newspace, return the label of the newspace. }
+    require N gt 0 and k gt 0 and o gt 0: "Inputs to NewspaceLabel must be positive integers.";
+    return Join([IntegerToString(N),IntegerToString(k),"E",Base26Encode(o-1)],".");
+end intrinsic;
+
 intrinsic SplitNewspaceLabel(s::MonStgElt) -> RngIntElt, RngIntElt, RngIntElt
 { Given the label N.k.a of a newspace, return the level N, weight k, char orbit a. }
     r := Split(s,".");
@@ -64,14 +70,15 @@ intrinsic SplitGamma1Label(s::MonStgElt) -> RngIntElt, RngIntElt
 end intrinsic;
 
 // encode Hecke orbit as a 64-bit integer
-intrinsic HeckeOrbitCode (N::RngIntElt,k::RngIntElt,o::RngIntElt,n::RngIntElt) -> RngIntElt
+intrinsic HeckeOrbitCode (N::RngIntElt,k::RngIntElt,o::RngIntElt,n::RngIntElt : Eisenstein := false) -> RngIntElt
 { Given positive integers N,k,o,n specifying the level, weight, char orbit, Hecke orbit of newform, return the 64-bit Hecke orbit code of the newform. }
     require N gt 0 and k gt 0 and o gt 0 and n gt 0: "Inputs to NewformLabel must be positive integers.";
     require N lt 2^24: "Level N must be less than 2^24.";
     require k lt 2^12: "Weight k must be less than 2^12.";
     require o lt 2^16: "Char orbit index o must be less than 2^16.";
     require n lt 2^12: "Hecke oribt index n must be less than 2^11.";
-    return N+2^24*k+2^36*(o-1)+2^52*(n-1);
+    eis := Eisenstein select 1 else 0;
+    return N+2^24*k+2^36*(o-1)+2^52*(n-1)+2^63*eis;
 end intrinsic;
 
 // extract Hecke orbit invariants from code

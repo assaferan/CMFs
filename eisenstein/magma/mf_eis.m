@@ -301,7 +301,7 @@ function DimensionData(chi, k, o)
 end function;
 
 // Decompose spaces S_k(N,chi)^new into Galois stable subspaces for B0 < k^2*N <= B and k > 1.
-procedure DecomposeSpace(outfile,B :TodoFile:="",B0:=0,Quiet:=false,DimensionsOnly:=false,Coeffs:=1000,DegBound:=20,Eigenvalues:=true,Cutters:=true,Twists:=true,
+procedure DecomposeSpace(outfile,B :TodoFile:="",B0:=0,Quiet:=false,DimensionsOnly:=false,Coeffs:=1000,DegBound:=20,Eigenvalues:=true,Cutters:=false,Twists:=false,
                           TrivialCharOnly:=false,TraceStats:=false,Precision:=0,Jobs:=1,JobId:=0,Timings:=true)
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
     if Jobs ne 1 then dimfile cat:= Sprintf("_%o",JobId); end if;

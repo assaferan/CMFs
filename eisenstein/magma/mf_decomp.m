@@ -501,7 +501,7 @@ procedure WriteSpaceData(fp, chi, k, o: CharTable:=AssociativeArray(), ComputeEi
         // f,b,a,c,d,pr,m := OptimizedOrderBasis(Eltseq(MinimalPolynomial(K.1)),[Eltseq(K!Coefficient(F[i],j)) : j in [1..n]]:Verbose:=Detail gt 0);
         assert IsCyclotomic(K);
         cyc := CyclotomicOrder(K);
-        if IsOdd(cyc) then 
+        if (N gt 1) and IsOdd(cyc) then 
             cyc *:= 2;
             K := CyclotomicField(cyc);
         end if;

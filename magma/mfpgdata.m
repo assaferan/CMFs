@@ -875,6 +875,8 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         P := PrimeDivisors(N);
         rec["level_is_prime"] := IsPrime(N) select 1 else 0;
         rec["level_is_prime_power"] := (N gt 1 and IsPrimePower(N)) select 1 else 0;
+        rec["level_is_prime_square"] := (sqr and IsPrime(sqrtN) where sqr, sqrtN := IsSquare(N)) select 1 else 0;
+        rec["level_is_powerful"] := (N mod (&*PrimeDivisors(N))^2 eq 0) select 1 else 0;
         rec["level_is_square"] := IsSquare(N) select 1 else 0;
         rec["level_is_squarefree"] := IsSquarefree(N) select 1 else 0;
         rec["level_primes"] := P;

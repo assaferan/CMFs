@@ -186,7 +186,10 @@ for k in sorted(db.mf_newspaces.col_type.keys()):
 but we want to leave id out
 */
 
+// We reorder to  have the label first, for update_from_file to work
+
 newspaces_columns := [
+<"label","text">,
 <"ALdims","integer[]">,
 <"ALdims_eis_new", "integer[]">,
 <"ALdims_eis_old", "integer[]">,
@@ -212,7 +215,6 @@ newspaces_columns := [
 <"hecke_cutter_primes","integer[]">,
 <"hecke_orbit_code","bigint">,
 <"hecke_orbit_dims","integer[]">,
-<"label","text">,
 <"level","integer">,
 <"level_is_powerful","boolean">,
 <"level_is_prime","boolean">,
@@ -238,18 +240,19 @@ newspaces_columns := [
 ];
 
 // cols set to true are computed by summing
+// We reorder to  have the label first, for update_from_file to work
 gamma1_columns := [
+<"label","text", false>,
 <"Nk2","bigint", false>,
 <"a4_dim","integer", true>,
 <"a5_dim","integer", true>,
 <"analytic_conductor","double precision", false>,
 <"cusp_dim","bigint", true>,
 <"dihedral_dim","integer", true>,
-<"dim","integer", true>,
+<"dim","bigint", true>,
 <"eis_dim","bigint", true>,
 <"eis_new_dim","bigint", true>,
 <"hecke_orbit_dims","bigint[]", false>,
-<"label","text", false>,
 <"level","integer", false>,
 <"level_is_powerful","boolean",false>,
 <"level_is_prime","boolean",false>,
@@ -530,7 +533,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
                     end if;
                 end if;
             end if;
-            assert Sort([x:x in Keys(g1rec)]) eq [t[1]: t in gamma1_columns];
+            assert Sort([x:x in Keys(g1rec) | x ne "label"]) eq [t[1]: t in gamma1_columns | t[1] ne "label"];
             // copy text fields as is (do not trim spaces!), and use curly braces in arrays
             str := bracket(Join([t[2] eq "text" select g1rec[t[1]] else (t[2][#t[2]] eq "]" select curly(s) else s where s:=sprint(g1rec[t[1]])):t in gamma1_columns],":"));
             if Detail gt 0 then print str; else if Detail ge 0 then printf "%o (%os, %oMB)\n", label, Cputime()-start, Memory(); end if; end if;
@@ -538,7 +541,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
             g1cnt +:= 1;
             g1N := 0;  g1k:= 0;
         end if;
-        assert Sort([x:x in Keys(rec)]) eq [t[1]: t in newspaces_columns];
+        assert Sort([x:x in Keys(rec) | x ne "label"]) eq [t[1]: t in newspaces_columns | t[1] ne "label"];
         // copy text fields as is (do not trim spaces!), and use curly braces in arrays
         str := bracket(Join([t[2] eq "text" select rec[t[1]] else (t[2][#t[2]] eq "]" select curly(s) else s where s:=sprint(rec[t[1]])):t in newspaces_columns],":"));
         if Detail gt 0 then print str; else if Detail ge 0 then printf "%o (%os, %oMB)\n", label, Cputime()-start, Memory(); end if; end if;
@@ -611,7 +614,10 @@ sage: for k in sorted(db.mf_newforms.col_type.keys()):
         
 but note true/false for label and space_label need to be swapped, and we want to leave out id
 */
+
+// We reorder to have label first for update_from_file to work
 newforms_columns := [
+<"label","text", false>,
 <"Nk2","integer", true>,
 <"analytic_conductor","double precision", true>,
 <"analytic_rank","smallint", false>,
@@ -658,7 +664,6 @@ newforms_columns := [
 <"is_self_dual","boolean", false>,
 <"is_self_twist","boolean", false>,
 <"is_twist_minimal","boolean", false>,
-<"label","text", false>,
 <"level","integer", true>,
 <"level_is_prime","boolean",true>,
 <"level_is_prime_power","boolean",true>,
@@ -690,7 +695,10 @@ newforms_columns := [
 <"weight_parity","smallint", true>
 ];
 
+// We reorder to have the label first in order for update_from_file to work
+
 hecke_nf_columns := [
+<"label","text", false>,
 <"a0_denom","numeric", false>,
 <"a0_num","numeric[]", false>,
 <"an","jsonb", false>,
@@ -706,7 +714,6 @@ hecke_nf_columns := [
 <"hecke_ring_numerators","numeric[]", false>,
 <"hecke_ring_power_basis","boolean", false>,
 <"hecke_ring_rank","integer", false>,
-<"label","text", false>,
 <"level","integer", true>,
 <"maxp","integer", false>,
 <"weight","smallint", true>
@@ -1559,7 +1566,9 @@ sage: from lmfdb import db
 sage: for k in sorted(db.mf_hecke_cc.col_type.keys()):
 .,..:      print '<"%s","%s">,'%(k,db.mf_hecke_cc.col_type[k])
 */
+// we reorder to have the label first for update_from_file to work
 hecke_cc_columns := [
+<"label","text">,
 <"an_normalized","double precision[]">,
 <"angles","double precision[]">,
 <"char_orbit_index","smallint">,
@@ -1573,7 +1582,6 @@ hecke_cc_columns := [
 <"embedding_root_real","double precision">,
 <"hecke_orbit","integer">,
 <"hecke_orbit_code","bigint">,
-<"label","text">,
 <"level","integer">,
 <"weight","smallint">
 ];
@@ -1975,13 +1983,13 @@ sage: for k in sorted(db.char_dir_orbits.col_type.keys()):
          print '<"%s","%s">,'%(k,db.char_dir_orbits.col_type[k])
 */
 char_dir_orbits_columns := [
+<"label","text">,
 <"char_degree","integer">,
 <"conductor","integer">,
 <"galois_orbit","integer[]">,
 <"is_minimal","boolean">,
 <"is_primitive","boolean">,
 <"is_real","boolean">,
-<"label","text">,
 <"modulus","integer">,
 <"orbit_index","smallint">,
 <"orbit_label","text">,

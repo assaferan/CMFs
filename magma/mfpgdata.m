@@ -772,7 +772,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
     if conrey_labels ne "" then
         start:=Cputime();
         S := Split(Read(conrey_labels),"\n");  // format is N:o:[n1,n2,...]:conductor:prim_index:order:deg:parity:isreal:isminimal (use conrey_XXX.txt)
-        for s in S do r:=Split(s,":"); ConreyTable[[StringToInteger(r[1]),StringToInteger(r[2])]] := r[3]; end for;
+        for s in S do r:=Split(s,":"); ConreyTable[[StringToInteger(r[1]),StringToInteger(r[2])]] := StringToIntegerArray(r[3]); end for;
         printf "Loaded %o records from conrey label file %o in %o secs.\n", #Keys(ConreyTable), conrey_labels, Cputime()-start;
     end if;
     start:=Cputime();
@@ -894,10 +894,10 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         rec["char_is_minimal"] := IsMinimal(chi) select 1 else 0;
         if o gt 1 and not IsDefined(ConreyTable,[N,o]) then
             t := Cputime();
-            ConreyTable[[N,o]] := sprint(ConreyIndex(chi));
+            ConreyTable[[N,o]] := ConreyIndexes(chi);
             printf "Generating Conrey labels for character orbit %o of modulus %o in %.3os\n", o, N, Cputime()-t;
         end if;
-        rec["conrey_index"] := o eq 1 select "1" else ConreyTable[[N,o]][1];
+        rec["conrey_index"] := o eq 1 select "1" else sprint(ConreyTable[[N,o]][1]);
         rec["char_parity"] := Parity(chi);
         rec["char_is_real"] := IsReal(chi) select 1 else 0;
         rec["char_degree"] := Degree(chi);
@@ -906,7 +906,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         if o eq 1 then
             v := [Integers()|n : x in u];
         else
-            v := [Integers()|n*a : a in ConreyCharacterAngles(N,clist[1],u)] where clist := atoii(ConreyTable[[N,o]]);
+            v := [Integers()|n*a : a in ConreyCharacterAngles(N,clist[1],u)] where clist := ConreyTable[[N,o]];
         end if;
         rec["char_values"] := <N,n,u,v>;
         m := #[d:d in dims|d eq 1];
@@ -1038,7 +1038,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             if IsDefined(ArtinTable,label) then
                 ar := ArtinTable[label];
                 if #ar[6] gt 0 and ar[6] ne "?" then
-                    L := atoi(ConreyTable[[r[1],r[3]]]); // is this used anywhere?
+                    L := ConreyTable[[r[1],r[3]]]; // is this used anywhere?
                     arlabels := Split(ar[6],"c");
                     cn := StringToIntegerArray(arlabels[2]); assert #cn eq dim;
                     artin_url := "\"ArtinRepresentation/" cat arlabels[1] cat "\"";
@@ -1606,7 +1606,7 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
     printf "Loaded %o records from input file %o in %o secs.\n", #S, infile, Cputime()-start;
     start:=Cputime();
     outfp := Open(outfile,"w");
-    if JobId eq 0 and not ap_only then write_header ("", outfp, hecke_cc_columns); end if;
+    if JobId eq 0 and ((not ap_only) or Eisenstein) then write_header ("", outfp, hecke_cc_columns); end if;
     cnt := 0;
     prec := ap_only select Precision else 2*Precision+1; // make sure we use enough intermediate precision to compute Satake angles to target precision
     CC := ComplexField(prec);
@@ -1737,16 +1737,19 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 if ap_only then
                     // don't normalize or use curly braces here, this data is being used to compute L-functions and is not to be loaded directly into postgres
                     ap := sprint([[sprintreal(Real(A[n][m]),Precision),sprintreal(Imaginary(A[n][m]),Precision)] : n in [1..#P]]);
-                    str := bracket(strip(Sprintf("%o:%o:%o:%o:%o:%o",rec["hecke_orbit_code"],rec["label"],e[1],e[2],rec["embedding_m"],ap)));
+                    // str := bracket(strip(Sprintf("%o:%o:%o:%o:%o:%o",rec["label"],rec["hecke_orbit_code"],e[1],e[2],rec["embedding_m"],ap)));
                 else
                     // normalize an here
                     rec["an_normalized"] := curly(sprint([[sprintreal(Real(A[n][m]/Z[n]),Precision),sprintreal(Imaginary(A[n][m]/n^((k-1)/2)),Precision)] : n in [1..coeffs]]));
                     rec["angles"] := curly(sprint([(GCD(N,p) eq 1 select sprintreal(SatakeAngle(A[p][m],C[j][m],p,k,pi:nmax:=nmax),Precision) else "null") where p:=P[j] : j in [1..#P]]));
                     s1 := Set([x:x in Keys(rec)]);  s2 := Set([t[1]: t in hecke_cc_columns]);
                     if s1 ne s2 then error Sprintf("hecke_cc_columns match error diffs %o and %o", s1 diff s2, s2 diff s1); end if;
-                    str := bracket(Join([sprint(rec[t[1]]):t in hecke_cc_columns],":"));
+                    // str := bracket(Join([sprint(rec[t[1]]):t in hecke_cc_columns],":"));
                     // strip(Sprintf("%o:%o:%o:%o:%o:%o:%o:%o:%o",code,lfunc_label,e[1],e[2],embedding_m,reroot,imroot,an,angles)));
                 end if;
+                // filling nulls
+                for c in hecke_cc_columns do if not IsDefined(rec, c[1]) then rec[c[1]] := "\\N"; end if; end for;
+                str := bracket(Join([sprint(rec[t[1]]):t in hecke_cc_columns],":"));
                 if Detail gt 0 then print str; end if;
                 Puts(outfp,str);  cnt +:= 1;
                 Flush(outfp);

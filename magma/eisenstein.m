@@ -48,9 +48,15 @@ function EisensteinAdmissibleCharacterPairs(chi, k : IdentifyConjugates := true,
   // all the Eisenstein series.
   check_n := func<eta, psi, exact |\
     (exact) select (N eq Conductor(eta) * Conductor(psi)) else (N subset Conductor(eta) * Conductor(psi))>;
-
+  /*
   pairs := &join{{<eta, psi> : psi in Elements(H) |\
     check_chi(eta, psi) and check_n(eta, psi, NewformsOnly)} : eta in Elements(H)};
+  */
+
+  // check_chi is taking very long - trying to cut down the time by not running it
+  pairs := {<eta, psi> : psi in Elements(H) | check_n(eta, psi, NewformsOnly) where eta := H!(chi*psi^(-1))};
+
+  // assert pairs eq pairs2;
 
   mth_power := func<pair, m | <pair[1]^m, pair[2]^m>>;
   n := Exponent(AbelianGroup(H));
@@ -93,4 +99,21 @@ function GaloisConjugacyNewEisensteinSeries(chi,k : Bound := 1000)
     end if;
   end if;
   return eis;
+end function;
+
+function NumOrbitsUpTo(B)
+  cnt := 0;
+  for N:=1 to Floor(B/4) do
+    conrey_labels := ConreyCharacterOrbitReps(N);
+    m := #conrey_labels;
+    for o in [1..m] do
+      chi := DirichletCharacter(conrey_labels[o]);
+      max_k := Floor(Sqrt(B/N));
+      num_k := IsEven(chi) select max_k div 2 else (max_k-1) div 2;
+      k0 := IsEven(chi) select 4 else 3;
+      cnt +:= num_k * #EisensteinAdmissibleCharacterPairs(chi, k0);
+      if (o eq 1) and IsPrime(N) then cnt +:= 1; end if; // for weight 2
+    end for;
+  end for;
+  return cnt;
 end function;

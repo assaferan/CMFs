@@ -239,31 +239,33 @@ newspaces_columns := [
 
 // cols set to true are computed by summing
 gamma1_columns := [
-<"Nk2","integer", false>,
+<"Nk2","bigint", false>,
 <"a4_dim","integer", true>,
 <"a5_dim","integer", true>,
 <"analytic_conductor","double precision", false>,
-<"cusp_dim","integer", true>,
+<"cusp_dim","bigint", true>,
 <"dihedral_dim","integer", true>,
 <"dim","integer", true>,
-<"eis_dim","integer", true>,
-<"eis_new_dim","integer", true>,
-<"hecke_orbit_dims","integer[]", false>,
+<"eis_dim","bigint", true>,
+<"eis_new_dim","bigint", true>,
+<"hecke_orbit_dims","bigint[]", false>,
 <"label","text", false>,
 <"level","integer", false>,
+<"level_is_powerful","boolean",false>,
 <"level_is_prime","boolean",false>,
 <"level_is_prime_power","boolean",false>,
+<"level_is_prime_square","boolean",false>,
 <"level_is_square","boolean",false>,
 <"level_is_squarefree","boolean",false>,
 <"level_primes","integer[]", false>,
 <"level_radical","integer", false>,
-<"mf_dim","integer", true>,
-<"mf_new_dim","integer", true>,
-<"newspace_dims","integer[]", false>,
+<"mf_dim","bigint", true>,
+<"mf_new_dim","bigint", true>,
+<"newspace_dims","bigint[]", false>,
 <"num_forms","integer", true>,
 <"num_spaces","integer", false>,
 <"s4_dim","integer", true>,
-<"sturm_bound","integer", false>,
+<"sturm_bound","bigint", false>,
 <"trace_bound","integer", false>,
 <"trace_display","numeric[]", false>,
 <"traces","numeric[]", false>,
@@ -689,6 +691,8 @@ newforms_columns := [
 ];
 
 hecke_nf_columns := [
+<"a0_denom","numeric", false>,
+<"a0_num","numeric[]", false>,
 <"an","jsonb", false>,
 <"ap","jsonb", false>,
 <"char_orbit_index","smallint", true>,
@@ -877,7 +881,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         // if o gt 1 and not IsDefined(OT,M) then G,T := CharacterOrbitReps(M:RepTable); OT[M] := <G,T>; end if;
         rec["char_conductor"] := M;
         rec["prim_orbit_index"] := CharacterOrbit(AssociatedPrimitiveCharacter(chi));// o eq 1 select 1 else OT[M][2][AssociatedPrimitiveCharacter(chi)];
-        rec["space_label"] := NewspaceLabel(N,k,o);
+        rec["space_label"] := Eisenstein select NewspaceEisensteinLabel(N,k,o) else NewspaceLabel(N,k,o);
         rec["char_orbit_label"] := Base26Encode(o-1);
         rec["char_order"] := Order(chi);
         rec["char_is_minimal"] := IsMinimal(chi) select 1 else 0;
@@ -907,7 +911,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             rec["hecke_orbit"] := n;
             rec["dim"] := dim;
             rec["relative_dim"] := ExactQuotient(dims[n],Degree(chi));
-            label := Eisenstein select NewformLabel(N,k,o,n) else NewformEisensteinLabel(N,k,o,n);
+            label := Eisenstein select NewformEisensteinLabel(N,k,o,n) else NewformLabel(N,k,o,n);
             rec["label"] := label;
             rechnf["label"] := rec["label"];
             code := HeckeOrbitCode(N,k,o,n : Eisenstein := Eisenstein);
@@ -1199,6 +1203,8 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                     an := SparseZetaWeightOneCoefficients([a[p]:p in PrimesInInterval(1,100)],xi,zz,zzn);
                     assert #an eq 100;
                     rechnf["an"] := sprint(an);
+                    rechnf["a0_num"] := r[10][nn][8];
+                    rechnf["a0_denom"] := r[10][nn][9];
                     P := PrimesInInterval(1,#a);
                     rechnf["ap"] := sprint(SparseZetaWeightOnePrimeCoefficients([a[p]:p in P],zz,zzn));
                     rechnf["maxp"] := P[#P];
@@ -1229,6 +1235,8 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                     an := r[10][nn][5];
                     assert #an ge 100;
                     rechnf["an"] := sprint(an[1..100]);
+                    rechnf["a0_num"] := r[10][nn][8];
+                    rechnf["a0_denom"] := r[10][nn][9];
                     P := PrimesInInterval(1,#an);
                     rechnf["ap"] := sprint([an[p] : p in P]);
                     rechnf["maxp"] := P[#P];
@@ -1573,11 +1581,14 @@ hecke_cc_columns := [
 procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBound:=0, Detail:=0, 
                             Jobs:=1, JobId:=0, conrey_labels:= "", ap_only:=false, SplitInput:=false, Eisenstein := false)
     assert Jobs gt 0 and JobId ge 0 and JobId lt Jobs;
+    if Eisenstein then assert ap_only; end if; 
+    // for Eisenstein it makes no sense to compute Satake angles from the traces, as they are not symmetric, 
+    // and have different sizes. At the moment, we simply do not compute them.
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
     ConreyTable:=AssociativeArray();
     if conrey_labels ne "" then
         start:=Cputime();
-        S := Split(Read(conrey_labels),"\n"); // format is N:o:n (minimal conrey char chi_N(n,*) in orbit o for modulus N)
+        S := Split(Read(conrey_labels),"\n"); // format is N:o:[n1,n2,...] (conrey chars chi_N(n,*) in orbit o for modulus N)
         for s in S do r:=Split(s,":"); ConreyTable[[StringToInteger(r[1]),StringToInteger(r[2])]] := StringToIntegerArray(r[3]); end for;
         printf "Loaded %o records from conrey label file %o in %o secs.\n", #Keys(ConreyTable), conrey_labels, Cputime()-start;
     end if;
@@ -1610,7 +1621,7 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
         rec["char_orbit_index"] := o;
         if o gt 1 and not IsDefined(T,N) then T[N] := CharacterOrbitReps(N); end if;
         chi := o eq 1 select DirichletGroup(N)!1 else T[N][o];
-        space_label := Sprintf("%o.%o.%o",N,k,Base26Encode(o-1));
+        space_label := Eisenstein select NewspaceEisensteinLabel(N,k,o) else NewspaceLabel(N,k,o);
         L := o eq 1 select [1] else ConreyTable[[r[1],r[3]]];
         off1 := #[d:d in dims|d eq 1];
         off2 := off1 + #r[10];
@@ -1718,7 +1729,7 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 if ap_only then
                     // don't normalize or use curly braces here, this data is being used to compute L-functions and is not to be loaded directly into postgres
                     ap := sprint([[sprintreal(Real(A[n][m]),Precision),sprintreal(Imaginary(A[n][m]),Precision)] : n in [1..#P]]);
-                    str := bracket(strip(Sprintf("%o:%o:%o:%o:%o:%o",rec["hecke_code,"],rec["label"],e[1],e[2],rec["embedding_m"],ap)));
+                    str := bracket(strip(Sprintf("%o:%o:%o:%o:%o:%o",rec["hecke_orbit_code"],rec["label"],e[1],e[2],rec["embedding_m"],ap)));
                 else
                     // normalize an here
                     rec["an_normalized"] := curly(sprint([[sprintreal(Real(A[n][m]/Z[n]),Precision),sprintreal(Imaginary(A[n][m]/n^((k-1)/2)),Precision)] : n in [1..coeffs]]));
@@ -1752,7 +1763,7 @@ procedure CreateSubspaceData (outfile, dimfile, conrey_labels: MaxN:=0, Detail:=
     delete S;
     CT:=AssociativeArray();  PT := AssociativeArray();
     start:=Cputime();
-    S := Split(Read(conrey_labels),"\n"); // format is N:o:n:M:po:ord:deg:parity:isreal (minimal conrey char chi_N(n,*) in orbit o, M=cond, po=primi_orbit_index
+    S := Split(Read(conrey_labels),"\n"); // format is N:o:[n1,n2,...]:M:po:ord:deg:parity:isreal (conrey chars chi_N(n,*) in orbit o, M=cond, po=primi_orbit_index
     for s in S do
         r:=Split(s,":");
         N := StringToInteger(r[1]); i := StringToInteger(r[2]); clabel := StringToInteger(r[3]); M := StringToInteger(r[4]); h := StringToInteger(r[5]);
@@ -1786,14 +1797,14 @@ procedure CreateSubspaceData (outfile, dimfile, conrey_labels: MaxN:=0, Detail:=
                 dims := [DT[[sub[1],k,sub[2]]][2] : sub in subs];
                 mults := [sub[3]: sub in subs];
                 assert &+[dims[n]*mults[n]: n in [1..#subs]] eq dim;
-                label := NewspaceLabel(N,k,i);
+                label := Eisenstein select NewspaceEisensteinLabel(N,k,i) else NewspaceLabel(N,k,i);
                 for n:=1 to #subs do
                     if dims[n] eq 0 then continue; end if;
                     id +:= 1;
                     M := subs[n][1];
                     j := subs[n][2];
                     j_label := Base26Encode(j-1);
-                    sub_label := NewspaceLabel(M,k,j : Eisenstein := Eisenstein);
+                    sub_label := Eisenstein select NewspaceEisensteinLabel(N,k,j) else NewspaceLabel(N,k,j);
                     str := strip(Sprintf("%o:%o:%o:%o:%o:%o:%o:%o:%o:%o:%o:%o:%o",
                             label,N,k,i,i_label,curly(sprint(i gt 1 select r[1] else [1])),sub_label,M,j,j_label,curly(sprint(j gt 1 select CT[[M,j]][1] else [1])),dims[n],mults[n]));
                     if Detail gt 0 then print str; end if;

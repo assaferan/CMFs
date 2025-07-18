@@ -1,7 +1,7 @@
 // !! TODO - work out why Magma still has bugs in constructing Eisenstein series
 
 import "../../magma/mf.m" : ComputeHeckeCutters, InnerTwistData, SortEmbeddings;
-
+/*
 function GaussSum(chi)
     N := Conductor(chi);
     if N eq 1 then
@@ -54,7 +54,10 @@ function QLvalue(chi, k)
     end if;
     return prim_val * prod * (N/f)^k;
 end function;
+*/
+// import "../../magma/Lvalue.m" : QLvalue;
 
+/*
 function EisensteinSeries(psi, phi, k : Bound := 1000)
     assert k ge 3; // For now we focus on k >= 3, no special cases
     assert IsPrimitive(psi);
@@ -131,6 +134,9 @@ function EisensteinAdmissibleCharacterPairs(chi, k : IdentifyConjugates := true,
   pairs := [* APC(pair) : pair in pairs *];
   return pairs;
 end function;
+*/
+
+import "../../magma/eisenstein.m" : EisensteinAdmissibleCharacterPairs, EisensteinSeries;
 
 function QDimension(triples)
     return &+[triple[3] : triple in triples];

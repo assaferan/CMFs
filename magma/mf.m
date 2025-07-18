@@ -1,5 +1,7 @@
 AttachSpec("mf.spec");
 
+import "eisenstein.m" : GaloisConjugacyNewEisensteinSeries;
+
 function IsPermutationMatrix(A) return &and[#[a:a in r|a ne 0] eq 1:r in A]; end function;
 function IsDiagonalMatrix(A) n := #A; return &and[[j:j in [1..n]|A[i][j] ne 0] eq [i]:i in [1..n]]; end function;
 
@@ -137,10 +139,11 @@ function InnerTwistData (a,chi,k:CharTable:=AssociativeArray())
     return Sort([<1,Multiplicity(Multiset(xi),x),x[1],x[2]> : x in Set(xi)],func<a,b|a[3] eq b[3] select a[4]-b[4] else a[3]-b[3]>);
 end function;
 
-function NewspaceTraces (chi, k, o, n: Detail:= 0)
+function NewspaceTraces (chi, k, o, n: Detail:= 0, Eisenstein:=false)
     start := Cputime();
     if Detail gt 0 then printf "Constructing space %o:%o:%o...", Modulus(chi),k,o; t:=Cputime(); end if;
-    NS := NewSubspace(CuspidalSubspace(ModularSymbols(chi,k,-1)));
+    NS := Eisenstein select NewSubspace(EisensteinSubspace(ModularSymbols(chi,k,0))) else 
+                            NewSubspace(CuspidalSubspace(ModularSymbols(chi,k,-1)));
     if Detail gt 0 then printf "dimension %o, took %o secs\n", QDimension(NS),Cputime()-t; end if;
     T := [];
     for i:=1 to n do
@@ -189,7 +192,7 @@ T = lex-sorted list of trace vectors [[tr(a_1),...tr(a_n)],...] for Galois conju
 A = Atkin-Lehner signs (empty list if chi is not the trivial character (i.e. i=1)) [[<p,sign> for p in Divisors(N)],...], one list of Atkin-Lehner signs for each subspace listed in D.
 F = Hecke field polys [[f0,f1,...,1],...] list of coeffs (constant coeff first), one list for each subspace listed in D of dimension up to the degree bound (currently 20); note that F[n] corresponds to the space D[n] but F may be shorter than D
 C = Hecke cutters [[<p,[g0,g1,...,1]>,...],...] list of minimal lists of coefficients of charpolys g(x) of T_p sufficient to distinguish all the subspaces listed in D up to the degree bound.
-E = Hecke Eigenvalue data [<g,b,n,m,e>,...] list of tuples <g,b,n,m,e> of Hecke eigenvalue data for each subspace listed in D of dimension greater than 1 up to the degree bound where:
+E = Hecke Eigenvalue data [<g,b,n,m,e,a0>,...] list of tuples <g,b,n,m,e,a0> of Hecke eigenvalue data for each subspace listed in D of dimension greater than 1 up to the degree bound where:
     g is a polredbestified field poly for the coefficient field (should be the same as the corresponding poly in F),
     b is a basis for the Hecke ring R:=Z[a_n] in terms of the power basis of K:=Q[x]/(f(x)) (a list of lists of rationals),
     n is an integer that divides the index [O_K:R] of the Hecke ring R in the ring of integers O_K
@@ -197,6 +200,8 @@ E = Hecke Eigenvalue data [<g,b,n,m,e>,...] list of tuples <g,b,n,m,e> of Hecke 
     e is a list of eigenvalues specified in terms of the basis b (list of deg(f) integers for each a_n)
     x is a pair <u,v> where u is a list of integers generating Z/NZ* and v is a list of values of chi on u in written in the basis b
     m is the list integer such that teh first m eigenvalues generate the Hecke ring (as a ring)
+    a0_num is the numerator of the constant term in the q-expansion of the normalized eigenform
+    a0_denom is the denominator of the constant term in the q-expansion of the normalized eigenform
 cm = list of cm discriminants, one for each subspace listed in D up to the degree bound, 0 indicates non-CM forms (rigorous)
 tw = list of lists of quadruples <b,n,m,i> identifying char orbits m.i of non-trivial inner twists with multiplicity n, b=0,1 indicates proved or not
 pra = list of boolean values (0 or 1) such that pra[i] is 1 if F[i] is the polredabs polynomial for the Hecke field
@@ -298,9 +303,18 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
         if Detail gt 0 then printf "Computing %o traces for space %o:%o:%o...", n, N,k,o; t:=Cputime(); end if;
         F := [*Eigenform(S[i],n+1):i in [1..#S]*];
         T := Sort([<[Integers()|Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F[i],j) : j in [1..n]],i> : i in [1..#F]]);
+        // now with constant term and keeping track of Dirichlet characters
+        if Eisenstein then 
+            F0 := GaloisConjugacyNewEisensteinSeries(chi,k : Bound := n);
+            assert #F eq #F0;
+            // making sure traces are the same
+            T0 := Sort([<[Integers()|Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F0[i],j) : j in [1..n]],i> : i in [1..#F0]]);
+            assert [x[1] : x in T] eq [x[1] : x in T0];
+        end if;
         if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
     end if;
-    D := [D[T[i][2]] : i in [1..#T]];  S := [S[T[i][2]] : i in [1..#T]];  F := [*F[T[i][2]] : i in [1.. #T]*];
+    D := [D[T[i][2]] : i in [1..#T]];  S := [S[T[i][2]] : i in [1..#T]];  F := [*F[T[i][2]] : i in [1.. #T]*]; 
+    if Eisenstein then F0 := [*F0[T[i][2]] : i in [1.. #T]*]; end if;
     T := [T[i][1] : i in [1..#T]];
     assert #Set(T) eq #T;
     if Detail gt 1 then printf "Lex sorted traces = %o\n", sprint(T); end if; 
@@ -347,7 +361,11 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
             if D[i] gt DegreeBound then break; end if;
             if Detail gt 0 then printf "Computing %o exact Hecke eigenvalues form %o:%o:%o:%o of dimension %o...",n,N,k,o,i,D[i]; t:=Cputime(); end if;
             K := AbsoluteField(BaseRing(Parent(F[i])));
-            f,b,a,c,d,pr,m := OptimizedOrderBasis(Eltseq(MinimalPolynomial(K.1)),[Eltseq(K!Coefficient(F[i],j)) : j in [1..n]]:Verbose:=Detail gt 0);
+            a0 := K!Coefficient(F[i],0); a0_denom := Denominator(a0);
+            a0_num := Eltseq(a0_denom*a0);
+            f,b,a,c,d,pr,m := OptimizedOrderBasis(Eltseq(MinimalPolynomial(K.1)),[a0_num] cat [Eltseq(K!Coefficient(F[i],j)) : j in [1..n]]:Verbose:=Detail gt 0);
+            a0_num := a[1];
+            a := a[2..#a];
             if ComputeCharacterValues then
                 if Detail gt 0 then printf "Computing character values in Hecke field for form %o:%o:%o:%o of dimension %o...",N,k,o,i,D[i]; t:=Cputime(); end if;
                 aa := NFSeq(f,b,a);
@@ -358,7 +376,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
                 if Detail gt 0 then printf "Computed Hecke eigenvalues but not computing character values in Hecke field."; end if;  
                 v := []; w := [];
             end if;
-            Append(~E,<f,b,c,<d,d eq 0 select Factorization(1) else Factorization(d)>,a,<u,w>,m>);  Append(~pra,pr select 1 else 0);  Append(~HF,f);  Append(~X,<u,v>);
+            Append(~E,<f,b,c,<d,d eq 0 select Factorization(1) else Factorization(d)>,a,<u,w>,m,a0_num,a0_denom>);  Append(~pra,pr select 1 else 0);  Append(~HF,f);  Append(~X,<u,v>);
             if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
             if ComputeTwists then 
                 if Detail gt 0 then printf "Computing self twists for form %o:%o:%o:%o of dimension %o...",N,k,o,i,D[i]; t:=Cputime(); end if;

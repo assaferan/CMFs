@@ -157,7 +157,7 @@ function qExpansionStringOverNF(a,minlen,maxlen,root_of_unity,power_basis : a0nu
     if IsEmpty(a0num) then a0num := zero; end if;
     s := LatexTermNF(a0num, 0, v, ss, oso, minlen); 
     if (#s gt 0) and (a0denom ne 1) then
-        s := Sprintf("\\frac{%o}{%o}", s, a0denom);
+        s := Sprintf("\\\\frac{%o}{%o}", s, a0denom);
     end if; 
     t := s;
     s cat:= (#s eq 0) select "q" else "+q"; 
@@ -175,8 +175,9 @@ function qExpansionStringOverQ(a,minlen,maxlen : a0num := 0, a0denom := 1)
     if a0num ne 0 then
         if a0denom ne 1 then
             assert a0denom gt 0;
+            s := "";
             if a0num lt 0 then s := "-"; end if;
-            s cat:= Sprintf("\\frac{%o}{%o}", Abs(a0num), a0denom);
+            s cat:= Sprintf("\\\\frac{%o}{%o}", Abs(a0num), a0denom);
         else
             s := Sprintf("%o", a0num);
         end if;

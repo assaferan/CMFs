@@ -398,7 +398,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         end if;
         P := PrimeDivisors(N);
         label := Eisenstein select NewspaceEisensteinLabel(N,k,o) else NewspaceLabel(N,k,o);
-        rec["is_cuspidal"] := Eisenstein selet 0 else 1;
+        rec["is_cuspidal"] := Eisenstein select 0 else 1;
         rec["label"] := label;
         rec["level"] := N;
         rec["level_is_prime"] := IsPrime(N) select 1 else 0;

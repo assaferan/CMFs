@@ -180,7 +180,7 @@ function SortEmbeddings (f, chi, prec)
 end function;
 
 /*
-Format of data is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap:a0_nums:a0_denoms
+Format of data is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap:a0_nums:a0_denoms:char_pairs
 The data depends on a degree bound (determines forms with exact eigenvalue data, a coefficient count (number of a_n to compute), and a complex precision (for forms without exact eigevnalue data)
 
 N = level, a positive integer
@@ -214,6 +214,7 @@ eap = list of lists of lists of real or complex valued a_p's for p up to the coe
       if character is trivial embedded a_p's will always be real (this is actually the only case currently used)
 a0_nums = traces of numerators of constant term
 a0_denoms = denominators of constant terms
+char_pairs = sequence of sequences of length 2 with the labels of the characters chi, psi such that E = E_{chi, psi}
 
 This format is also documented in https://github.com/JohnCremona/CMFs/blob/master/README.md.
 */
@@ -307,7 +308,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
         T := Sort([<[Integers()|Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F[i],j) : j in [1..n]],i> : i in [1..#F]]);
         // now with constant term and keeping track of Dirichlet characters
         if Eisenstein then 
-            F0 := GaloisConjugacyNewEisensteinSeries(chi,k : Bound := n);
+            F0, char_pairs := GaloisConjugacyNewEisensteinSeries(chi,k : Bound := n);
             assert #F eq #F0;
             // making sure traces are the same
             T0 := Sort([<[Integers()|Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F0[i],j) : j in [1..n]],i> : i in [1..#F0]]);
@@ -318,6 +319,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     D := [D[T[i][2]] : i in [1..#T]];  S := [S[T[i][2]] : i in [1..#T]];  F := [*F[T[i][2]] : i in [1.. #T]*]; 
     if Eisenstein then 
         F0 := [*F0[T[i][2]] : i in [1.. #T]*]; 
+        char_pairs := [*char_pairs[T[i][2]] : i in [1..#T]*];
         a0 := [ Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F0[i],0) : i in [1..#F0] ];
         a0_nums := [Numerator(x) : x in a0];
         a0_denoms := [Denominator(x) : x in a0];
@@ -470,6 +472,8 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     if ComputeEigenvalues then s cat:= Sprintf(":%o",[IsSelfDual(chi,D[i],T[i],#HF ge i select HF[i] else [],S[i] : Eisenstein := Eisenstein) select 1 else 0:i in [1..#D]]); else s cat:= ":[]"; end if;
     s cat:= Sprintf(":%o",eap);
     s cat:= Sprintf(":%o:%o", a0_nums, a0_denoms);
+    char_pairs_str := [Sprintf("%o", {Sprintf("\"%o\"", CharacterOrbitLabel(p[j])) : j in [1..2]}) : p in char_pairs];
+    s cat:= Sprintf(":%o", char_pairs_str);
     if ReturnDecomposition then return strip(s),S; else return strip(s); end if;
 end function;
 

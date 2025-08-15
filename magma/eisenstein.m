@@ -96,9 +96,10 @@ function GaloisConjugacyNewEisensteinSeries(chi,k : Bound := 1000)
       chi0 := DirichletGroup(1)!1;
       E2<q> := EisensteinSeries(chi0, chi0, 2 : Bound := Bound);
       eis cat:= [* E2 - N*Evaluate(E2, q^N) *];
+      pairs cat:= [* <chi0, chi0> *];
     end if;
   end if;
-  return eis;
+  return eis, pairs;
 end function;
 
 function NumOrbitsUpTo(B)

@@ -1071,7 +1071,14 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             if k gt 1 then
                 rec["sato_tate_group"] := rec["is_cm"] eq 1 select Sprintf("%o.2.1.d%o",k-1,Order(chi)) else Sprintf("%o.2.3.c%o",k-1,Order(chi));
             end if;
-            if k eq 2 and o eq 1 and dim eq 1 then Append(~ro, Sprintf("\"EllipticCurve/Q/%o/%o\"",N,Base26Encode(n-1))); end if;
+            if k eq 2 and o eq 1 and dim eq 1 and not Eisenstein then Append(~ro, Sprintf("\"EllipticCurve/Q/%o/%o\"",N,Base26Encode(n-1))); end if;
+            if Eisenstein then
+                assert #r ge 22;
+                for char_label in r[22][n] do
+                    c_char, o_char := Explode(Split(char_label, "."));
+                    Append(~ro, Sprintf("\"Character/Dirichlet/%o/%o\"", c_char, o_char));
+                end for;
+            end if;
             ero := [];
             if IsDefined(ArtinTable,label) then
                 ar := ArtinTable[label];

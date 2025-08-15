@@ -241,6 +241,7 @@ newspaces_columns := [
 <"hecke_cutter_primes","integer[]">,
 <"hecke_orbit_code","bigint">,
 <"hecke_orbit_dims","integer[]">,
+<"is_cuspidal", "boolean">,
 <"level","integer">,
 <"level_is_powerful","boolean">,
 <"level_is_prime","boolean">,
@@ -397,6 +398,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
         end if;
         P := PrimeDivisors(N);
         label := Eisenstein select NewspaceEisensteinLabel(N,k,o) else NewspaceLabel(N,k,o);
+        rec["is_cuspidal"] := Eisenstein selet 0 else 1;
         rec["label"] := label;
         rec["level"] := N;
         rec["level_is_prime"] := IsPrime(N) select 1 else 0;
@@ -686,6 +688,7 @@ newforms_columns := [
 <"inner_twists","integer[]", false>,
 <"inner_twist_count","integer", false>,
 <"is_cm","boolean", false>,
+<"is_cuspidal","boolean", true>,
 <"is_largest","boolean", false>,
 <"is_maximal","boolean", false>,
 <"is_polredabs","boolean", false>,

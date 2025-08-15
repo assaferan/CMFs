@@ -65,7 +65,7 @@ procedure WriteConreyLabelsFile(outfile, maxN : minN := 1, Quiet := false)
     return;
 end procedure;
 
-procedure DoEverythingNk2UpTo(B : folder := "../data/")
+procedure DoEverythingNk2UpTo(B : folder := "../data/", do_conrey := false)
     infile := folder cat "Nk2_";
     infile_dim := infile cat "dim_only";
     dimfile := infile cat "dim";
@@ -76,9 +76,12 @@ procedure DoEverythingNk2UpTo(B : folder := "../data/")
     outfile_prefix := folder cat "Nk2_";
     outfile_hecke_cc := outfile_prefix cat "mf_hecke_cc_" cat suffix;
     conrey_labels := infile cat "conrey_" cat suffix;
+    infile cat:= suffix;
+    infile_dim cat:= suffix;
+    dimfile cat:= suffix;
     // These files were generated already - Drew has some versions conrey_XXX.txt
     // in Drew's magma repo the file chars.m has the function ConreyOrbitLabelTable
-    WriteConreyLabelsFile(conrey_labels, B);
+    if do_conrey then WriteConreyLabelsFile(conrey_labels, B); end if;
     // DecomposeSpace(infile_dim, B : DimensionsOnly, Timings := false);
     // Drew is using NewspaceDump instead of NewspaceData (on his fork?)
     // Todofile for TraceHint is the output from mftraces.gp of DumpTraces

@@ -619,6 +619,7 @@ but note true/false for label and space_label need to be swapped, and we want to
 newforms_columns := [
 <"label","text", false>,
 <"Nk2","integer", true>,
+<"a0_denom", "numeric", false>,
 <"analytic_conductor","double precision", true>,
 <"analytic_rank","smallint", false>,
 <"analytic_rank_proved","boolean",false>,
@@ -690,6 +691,7 @@ newforms_columns := [
 <"self_twist_discs","integer[]", false>,
 <"self_twist_type","smallint", false>,
 <"space_label","text", true>,
+<"trace_a0_num", "numeric", false>,
 <"trace_display","numeric[]", false>,
 <"trace_hash","bigint", false>,
 <"trace_moments","numeric[]", false>,
@@ -1161,7 +1163,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                 if n le #r[9] then rec["hecke_cutters"] := r[9][n]; end if;
             end if;
             rec["is_self_dual"] := r[18][n];
-            if n le m then
+            if n le m then // form has rational coefficients
                 if o gt 1 then rechnf["hecke_ring_character_values"] := [<r[17][n][1][i],r[17][n][2][i]>:i in [1..#r[17][n][1]]]; end if;
                 rec["qexp_display"] := qExpansionStringOverQ(r[6][n],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS);
                 rec["hecke_ring_generator_nbound"] := 1;
@@ -1172,6 +1174,8 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                 rechnf["hecke_ring_rank"] := 1;
                 rechnf["hecke_ring_power_basis"] := 1;
                 rechnf["an"] := sprint([[tr[i]]:i in [1..100]]);
+                rechnf["a0_num"] := sprint([r[20][n]]);
+                rechnf["a0_denom"] := r[21][n];
                 P := PrimesInInterval(1,#tr);
                 rechnf["ap"] := sprint([[tr[p]] : p in P]);
                 rechnf["maxp"] := P[#P];
@@ -1266,6 +1270,8 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                     lpcnt +:=#LPP; Flush(lpoly_fp);
                 end if;
             end if;
+            rec["trace_a0_num"] := r[20][n];
+            rec["a0_denom"] := r[21][n];
             s1 := Set([x:x in Keys(rec)]);  s2 := Set([t[1]: t in newforms_columns]);
             if s1 ne s2 then error Sprintf("newforms_columns match error diffs %o and %o", s1 diff s2, s2 diff s1); end if;
             str := bracket(Join([t[2] eq "text" select rec[t[1]] else (t[2][#t[2]] eq "]" select curly(bracket(s)) else s where s:=sprint(rec[t[1]])):t in newforms_columns],":"));

@@ -180,7 +180,7 @@ function SortEmbeddings (f, chi, prec)
 end function;
 
 /*
-Format of data is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap
+Format of data is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap:a0_nums:a0_denoms
 The data depends on a degree bound (determines forms with exact eigenvalue data, a coefficient count (number of a_n to compute), and a complex precision (for forms without exact eigevnalue data)
 
 N = level, a positive integer
@@ -212,6 +212,8 @@ X = list of pairs <u,v> one for each entry in F where u is a list of integers r 
 sd = list of booleans, one for each entry in D, indicating whether newform is self dual or not (i.e. a_n are real)
 eap = list of lists of lists of real or complex valued a_p's for p up to the coefficient bound for each embedding of each form where exact eigenvalues have not been computed
       if character is trivial embedded a_p's will always be real (this is actually the only case currently used)
+a0_nums = traces of numerators of constant term
+a0_denoms = denominators of constant terms
 
 This format is also documented in https://github.com/JohnCremona/CMFs/blob/master/README.md.
 */
@@ -314,7 +316,12 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
         if Detail gt 0 then printf "took %o secs\n", Cputime()-t; end if;
     end if;
     D := [D[T[i][2]] : i in [1..#T]];  S := [S[T[i][2]] : i in [1..#T]];  F := [*F[T[i][2]] : i in [1.. #T]*]; 
-    if Eisenstein then F0 := [*F0[T[i][2]] : i in [1.. #T]*]; end if;
+    if Eisenstein then 
+        F0 := [*F0[T[i][2]] : i in [1.. #T]*]; 
+        a0 := [ Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F0[i],0) : i in [1..#F0] ];
+        a0_nums := [Numerator(x) : x in a0];
+        a0_denoms := [Denominator(x) : x in a0];
+    end if;
     T := [T[i][1] : i in [1..#T]];
     assert #Set(T) eq #T;
     if Detail gt 1 then printf "Lex sorted traces = %o\n", sprint(T); end if; 
@@ -361,11 +368,12 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
             if D[i] gt DegreeBound then break; end if;
             if Detail gt 0 then printf "Computing %o exact Hecke eigenvalues form %o:%o:%o:%o of dimension %o...",n,N,k,o,i,D[i]; t:=Cputime(); end if;
             K := AbsoluteField(BaseRing(Parent(F[i])));
-            a0 := K!Coefficient(F[i],0); a0_denom := Denominator(a0);
-            a0_num := Eltseq(a0_denom*a0);
-            f,b,a,c,d,pr,m := OptimizedOrderBasis(Eltseq(MinimalPolynomial(K.1)),[a0_num] cat [Eltseq(K!Coefficient(F[i],j)) : j in [1..n]]:Verbose:=Detail gt 0);
-            a0_num := a[1];
-            a := a[2..#a];
+            a0 := Eltseq(K!Coefficient(F[i],0)); 
+            an := [Eltseq(K!Coefficient(F[i],j)) : j in [1..n]];
+            f := Eltseq(MinimalPolynomial(K.1));
+            f,b,a,c,d,pr,m,a0 := OptimizedOrderBasis(f,an,a0 :Verbose:=Detail gt 0);
+            a0_denom := Denominator(Vector(a0));
+            a0_num := Eltseq(a0_denom*Vector(a0));
             if ComputeCharacterValues then
                 if Detail gt 0 then printf "Computing character values in Hecke field for form %o:%o:%o:%o of dimension %o...",N,k,o,i,D[i]; t:=Cputime(); end if;
                 aa := NFSeq(f,b,a);
@@ -461,6 +469,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     s cat:= Sprintf(":%o",X);
     if ComputeEigenvalues then s cat:= Sprintf(":%o",[IsSelfDual(chi,D[i],T[i],#HF ge i select HF[i] else [],S[i] : Eisenstein := Eisenstein) select 1 else 0:i in [1..#D]]); else s cat:= ":[]"; end if;
     s cat:= Sprintf(":%o",eap);
+    s cat:= Sprintf(":%o:%o", a0_nums, a0_denoms);
     if ReturnDecomposition then return strip(s),S; else return strip(s); end if;
 end function;
 

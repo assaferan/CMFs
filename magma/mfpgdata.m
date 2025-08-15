@@ -86,7 +86,7 @@ function LatexSubTerm(c,v,e:First:=false,SubscriptZeroIsOne:=false,Superscript:=
     return s cat es;
 end function;
 
-function qexp_display_len (s)
+function qexp_display_len(s)
     alphabet := "abcdefghijklmnopqrstuvwxyz";
     n := 0;
     i := 1;  e := #s;
@@ -117,8 +117,36 @@ function qexp_display_len (s)
     end while;
     return n;
 end function;
-        
-function qExpansionStringOverNF(a,minlen,maxlen,root_of_unity,power_basis)
+
+function LatexTermNF(elt, n, v, ss, oso, minlen)
+    s := "";
+    if &and[elt[i] eq 0 : i in [2..#elt]] then
+        if (elt[1] eq 0) then return s; end if; 
+        s cat:= LatexTerm(elt[1],"q",n);
+    else
+        if #[c:c in elt|c ne 0] eq 1 then
+            i:=[j:j in [1..#elt]|elt[j] ne 0][1];
+            s cat:= LatexSubTerm(elt[i],v,i-1:SubscriptZeroIsOne,Superscript:=ss,OmitSubscriptOne:=oso);
+        else
+            s cat:= "+(";
+            i := 1;
+            while i le #elt do
+                if elt[i] ne 0 then
+                    s cat:= LatexSubTerm(elt[i],v,i-1:First:=(s[#s] eq "("),SubscriptZeroIsOne,Superscript:=ss,OmitSubscriptOne:=oso);
+                    if qexp_display_len(s) gt minlen then i +:= 1; break; end if;
+                end if;
+                i +:=1;
+            end while;
+            s cat:= i le #elt select "+\\\\cdots)" else ")";
+        end if;
+        if (n ne 0) then 
+            s cat:= Sprintf("q^{%o}",n);
+        end if;
+    end if;
+    return s;
+end function;
+
+function qExpansionStringOverNF(a,minlen,maxlen,root_of_unity,power_basis : a0num := [], a0denom := 1)
     d := #a[1];
     zero := [0: i in [1..d]];
     one := [1] cat [0:i in [2..d]];
@@ -126,40 +154,37 @@ function qExpansionStringOverNF(a,minlen,maxlen,root_of_unity,power_basis)
     v := root_of_unity eq 0 select "\\\\beta " else (root_of_unity eq 4 select "i" else Sprintf("\\\\zeta_{%o}",root_of_unity));
     ss := root_of_unity gt 0 or power_basis ne 0;
     oso := d le 2;
-    s := "q";  t := s;
+    if IsEmpty(a0num) then a0num := zero; end if;
+    s := LatexTermNF(a0num, 0, v, ss, oso, minlen); 
+    if (#s gt 0) and (a0denom ne 1) then
+        s := Sprintf("\\frac{%o}{%o}", s, a0denom);
+    end if; 
+    t := s;
+    s cat:= (#s eq 0) select "q" else "+q"; 
     n := 2;
     while qexp_display_len(s) lt minlen and n le #a do
         t := s;
-        if a[n] ne zero then
-            if &and[a[n][i] eq 0 : i in [2..#a[n]]] then
-                s cat:= LatexTerm(a[n][1],"q",n);
-             else
-                if #[c:c in a[n]|c ne 0] eq 1 then
-                    i:=[j:j in [1..#a[n]]|a[n][j] ne 0][1];
-                    s cat:= LatexSubTerm(a[n][i],v,i-1:SubscriptZeroIsOne,Superscript:=ss,OmitSubscriptOne:=oso);
-                else
-                    s cat:= "+(";
-                    i := 1;
-                    while i le #a[n] do
-                        if a[n][i] ne 0 then
-                            s cat:= LatexSubTerm(a[n][i],v,i-1:First:=(s[#s] eq "("),SubscriptZeroIsOne,Superscript:=ss,OmitSubscriptOne:=oso);
-                            if qexp_display_len(s) gt minlen then i +:= 1; break; end if;
-                        end if;
-                        i +:=1;
-                    end while;
-                    s cat:= i le #a[n] select "+\\\\cdots)" else ")";
-                end if;
-                s cat:= Sprintf("q^{%o}",n);
-            end if;
-        end if;
+        s cat:= LatexTermNF(a[n], n, v, ss, oso, minlen - qexp_display_len(s));
         n +:= 1;
     end while;
     return (qexp_display_len(s) le maxlen select s else t) cat "+\\\\cdots";
 end function;
 
-function qExpansionStringOverQ(a,minlen,maxlen)
+function qExpansionStringOverQ(a,minlen,maxlen : a0num := 0, a0denom := 1)
     assert a[1] eq 1;
-    s := "q";  t := s;
+    if a0num ne 0 then
+        if a0denom ne 1 then
+            assert a0denom gt 0;
+            if a0num lt 0 then s := "-"; end if;
+            s cat:= Sprintf("\\frac{%o}{%o}", Abs(a0num), a0denom);
+        else
+            s := Sprintf("%o", a0num);
+        end if;
+        t := s;
+        s cat:= "+q";
+    else
+        s := "q";  t := s;
+    end if;
     n := 2;
     while qexp_display_len(s) lt minlen and n le #a do
         t := s;
@@ -734,7 +759,7 @@ hecke_lpolys_columns := [
 
 
 /*
- Format of infile is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap where
+ Format of infile is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap:a0_num:a0_denom where
 
  1) N = level, a positive integer
  2) k = weight, a positive integer (for .m.txt files, k > 1)
@@ -745,7 +770,7 @@ hecke_lpolys_columns := [
  7) A = Atkin-Lehner signs (empty list if chi is not the trivial character (i.e. i=1)) [[<p,sign> for p in Divisors(N)],...], one list of Atkin-Lehner signs for each subspace listed in D.
  8) F = Hecke field polys [[f0,f1,...,1],...] list of coeffs (constant coeff first), one list for each subspace listed in D of dimension up to the degree bound (currently 20); note that F[n] corresponds to the space D[n] but F may be shorter than D
  9) C = Hecke cutters [[<p,[g0,g1,...,1]>,...],...] list of minimal lists of coefficients of kernel polys g_p in T_p sufficient to distinguish all the subspaces listed in D (i.e. the ith form is the unique form lying in the kernel of g_p(T_p) for all the tuples <p,coeffs(g_p)> in the ith list)
-10) E = Hecke Eigenvalue data [<g,b,c,d,a,x,m>,...] list of 7-tuples of Hecke eigenvalue data for each subspace listed in D of dimension greater than 1 up to the degree bound where:
+10) E = Hecke Eigenvalue data [<g,b,c,d,a,x,m,a0_num,a0_denom>,...] list of 7-tuples of Hecke eigenvalue data for each subspace listed in D of dimension greater than 1 up to the degree bound where:
       1) g is a list of coefficients of a polredbestified field poly for the Hecke field K (should match entry in F),
       2) b is a list of lists of rationals specifying a basis for the Hecke ring R:=Z[a_n] in terms of the power basis for g
       3) c is an integer that divides the index [O_K:R] of the Hecke ring R in the ring of integers O_K of the Hecke field
@@ -753,6 +778,8 @@ hecke_lpolys_columns := [
       5) a is a list of lists of integers encoding eigenvalues in terms of the basis b
       6) x is a pair <u,v> where u lists integers generating (Z/NZ)* and v lists of values of chi on u in basis b
       7) m is the least integer such that the coefficients a_1,...,a_m generate the Hecke ring (as a ring)
+      8) a0_num is the numerator of a0
+      9) a0_denom is the denominator of a0
 11) cm = list of pairs <proved,discs> where proved=0,1 and discs is a list of 0, 1, or 3 fundamental discriminants (for k > 1 there is at most 1 and it is a negative discriminant), one pair for each subspace listed in D
 12) tw = list of lists of quadrauples <proved,n,m,o> where proved=0,1, n >=1 is a multiplicity, and m and o identify a Galois orbit of a characters [phi] of modulus m for which the corresponding form admits n distinct non-trivial inner-twist by characters in xi in [phi], one list for each subspace up to degree bound. All self-twists are guaranteed to be included, but quadruples with proved=0 could in principal be false positives.
 13) pra = list of boolean values (0 or 1) such that pra[i] is 1 if F[i] is the polredabs polynomial for the Hecke field
@@ -762,6 +789,8 @@ hecke_lpolys_columns := [
 17) X = list of pairs <u,v>, one for each entry in F, where u is a list of integer generators for (Z/NZ)* and v is a list of lists of rationals specifying corresponding values of chi in the Hecke field in terms of the power basis for F[i].
 18) sd = list of boolean values (0,1), one for each subspace in D indicating whether the subspace is self-dual (meaning the a_n are real-valued)
 19) eap = list of lists of lists of embedded ap's, one for each subspace in D of dimension greater than the degree bound; for trivial character these are lists of real numbers, otherwise lists of pairs of real numbers encoding real and imaginary parts (the latter 0 if a_n is real).  For each subspace of dimension d there are d lists of embedded ap's [a_2,a_3,...]
+20) a0_num = trace of the numerator of a0
+21) a0_denom = denominator of a0
 */
 
 procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, Jobs:=1, JobId:=0, 
@@ -1165,7 +1194,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             rec["is_self_dual"] := r[18][n];
             if n le m then // form has rational coefficients
                 if o gt 1 then rechnf["hecke_ring_character_values"] := [<r[17][n][1][i],r[17][n][2][i]>:i in [1..#r[17][n][1]]]; end if;
-                rec["qexp_display"] := qExpansionStringOverQ(r[6][n],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS);
+                rec["qexp_display"] := qExpansionStringOverQ(r[6][n],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS : a0num := r[20][n], a0denom := r[21][n]);
                 rec["hecke_ring_generator_nbound"] := 1;
                 rec["hecke_ring_index"] := 1;
                 rec["hecke_ring_index_factorization"] := [];
@@ -1227,7 +1256,8 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                     rechnf["maxp"] := P[#P];
                     // Convert to dense representation over [1,zeta_n,...,zeta_n^(n-1)] for call to qExpansionStringOverNF
                     function densify(a,n) v:=[0:i in [1..n]]; for t in a do v[t[2]+1]:=t[1]; end for; return v; end function;
-                    rec["qexp_display"] := qExpansionStringOverNF([densify(z,zzn):z in an],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS,zzn,0);
+                    rec["qexp_display"] := qExpansionStringOverNF([densify(z,zzn):z in an],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS,zzn,0 : 
+                                                                  a0num := densify(r[10][nn][8],zzn), a0denom := r[10][nn][9]);
                     KR:=PolynomialRing(K);
                     for p in LPP do
                         lpoly := RT!Norm(KR!1 - a[p]*KR.1 + xi(p)*p^(k-1)*KR.1^2);
@@ -1257,7 +1287,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                     P := PrimesInInterval(1,#an);
                     rechnf["ap"] := sprint([an[p] : p in P]);
                     rechnf["maxp"] := P[#P];
-                    rec["qexp_display"] := qExpansionStringOverNF(r[10][nn][5],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS,rec["field_poly_is_cyclotomic"] eq 1 select rec["field_poly_root_of_unity"] else 0,rechnf["hecke_ring_power_basis"]);
+                    rec["qexp_display"] := qExpansionStringOverNF(r[10][nn][5],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS,rec["field_poly_is_cyclotomic"] eq 1 select rec["field_poly_root_of_unity"] else 0,rechnf["hecke_ring_power_basis"] : a0num := rechnf["a0_num"], a0denom := rechnf["a0_denom"]);
                     a := NFSeq(r[10][nn][1],r[10][nn][2],r[10][nn][5][1..Max(100,r[10][nn][7])]);
                     K := Universe(a);
                     xi := CharacterFromValues(N,r[17][n][1],[K|x : x in r[17][n][2]]);

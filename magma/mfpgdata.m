@@ -280,6 +280,7 @@ gamma1_columns := [
 <"eis_dim","bigint", true>,
 <"eis_new_dim","bigint", true>,
 <"hecke_orbit_dims","bigint[]", false>,
+<"is_cuspidal","boolean",false>,
 <"level","integer", false>,
 <"level_is_powerful","boolean",false>,
 <"level_is_prime","boolean",false>,

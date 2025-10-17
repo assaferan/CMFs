@@ -9,7 +9,7 @@ end intrinsic;
 intrinsic NewformEisensteinLabel(N::RngIntElt,k::RngIntElt,o::RngIntElt,n::RngIntElt) -> MonStgElt
 { Given positive integers N,k,o,n specifying the level, weight, char orbit, Hecke orbit of newform, return the label of the newform. }
     require N gt 0 and k gt 0 and o gt 0 and n gt 0: "Inputs to NewformLabel must be positive integers.";
-    return Join([IntegerToString(N),IntegerToString(k),Base26Encode(o-1),"E",Base26Encode(n-1)],".");
+    return Join([IntegerToString(N),IntegerToString(k),"E",Base26Encode(o-1),Base26Encode(n-1)],".");
 end intrinsic;
 
 intrinsic SplitNewformLabel(s::MonStgElt) -> RngIntElt,RngIntElt,RngIntElt,RngIntElt

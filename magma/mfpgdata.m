@@ -982,6 +982,12 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             if IsDefined(RankTable,label) and RankTable[label][1] ge 0 then
                 rec["analytic_rank"] := RankTable[label][1];
                 rec["analytic_rank_proved"] := RankTable[label][2];
+            elif Eisenstein then
+                rec["analytic_rank"] := 0;
+                // !! TODO : Not clear that this is always true (Chowla's conjecture). 
+                // Can check if this is proven for the Dirichlet characters
+                // I think this is true for all the data we have generated.
+                rec["analytic_rank_proved"] := 1;
             else
                 printf "Warning: no record for newform %o found in RankTable\n", label;
             end if;

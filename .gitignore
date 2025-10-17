@@ -17,3 +17,6 @@ tempfile-*
 
 # local link to custom gp executable
 gp
+
+# data files
+eisenstein/data

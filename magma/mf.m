@@ -472,7 +472,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     if ComputeEigenvalues then s cat:= Sprintf(":%o",[IsSelfDual(chi,D[i],T[i],#HF ge i select HF[i] else [],S[i] : Eisenstein := Eisenstein) select 1 else 0:i in [1..#D]]); else s cat:= ":[]"; end if;
     s cat:= Sprintf(":%o",eap);
     s cat:= Sprintf(":%o:%o", a0_nums, a0_denoms);
-    char_pairs_str := [Sprintf("%o", {Sprintf("\"%o\"", CharacterOrbitLabel(p[j])) : j in [1..2]}) : p in char_pairs];
+    char_pairs_str := [Sprintf("%o", [Sprintf("\"%o\"", CharacterOrbitLabel(p[j])) : j in [1..2]]) : p in char_pairs];
     s cat:= Sprintf(":%o", char_pairs_str);
     if ReturnDecomposition then return strip(s),S; else return strip(s); end if;
 end function;

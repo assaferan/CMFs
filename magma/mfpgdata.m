@@ -510,7 +510,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
             g1N := N; g1k := k; g1sscnt := 1;
             for c in gamma1_columns do g1rec[c[1]] := "\\N"; end for;
             g1rec["label"] := Eisenstein select Gamma1EisensteinLabel(N,k) else Gamma1Label(N,k);
-            for c in ["level", "level_is_prime", "level_is_prime_power", "level_is_square", "level_is_squarefree", "level_primes", "level_radical", "weight", "weight_parity", "Nk2","analytic_conductor"] do
+            for c in ["level", "level_is_prime", "level_is_prime_power", "level_is_square", "level_is_squarefree", "level_primes", "level_radical", "weight", "weight_parity", "Nk2","analytic_conductor", "is_cuspidal"] do
                 g1rec[c] := rec[c];
             end for;
             for c in gamma1_columns do if c[3] and non_null([rec],c[1]) then g1rec[c[1]] := rec[c[1]]; end if; end for; 
@@ -907,6 +907,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
         conrey := ConreyCharacterOrbitReps(N);
         rec["Nk2"]:= N*k*k;
         rec["level"] := N;
+        rec["is_cuspidal"] := Eisenstein select 0 else 1;
         rechnf["level"] := N;
         P := PrimeDivisors(N);
         rec["level_is_prime"] := IsPrime(N) select 1 else 0;

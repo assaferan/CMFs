@@ -9,7 +9,7 @@ import "../../magma/mf.m" : DecomposeSpace;
 
 input_columns := ["level", "weight", "char_orbit", "time", "dims", "traces", "AL_signs", "hecke_fields",
                   "hecke_cutters", "hecke_ev_data", "cm", "twists", "is_polredabs", "zero_rate", "moments", 
-                  "trace_hashes", "char_gens_values", "self_dual", "embedded_ap"];
+                  "trace_hash", "char_gens_values", "self_dual", "embedded_ap"];
 
 space_input_columns := ["level", "weight", "char_orbit", "time", "dims", "traces", "hecke_fields", "AL_signs", "hecke_cutters"];
 

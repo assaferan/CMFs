@@ -1698,7 +1698,14 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
         // Dynamicall adjust coeffs if not specified
         if Coeffs eq 0 then if N le 1000 then coeffs := 1000; else if N le 4000 then coeffs := 2000; else coeffs:= 3000; end if; end if; end if;
         P := PrimesInInterval(1,coeffs);
-        if not ap_only then Z := [(CC!n)^((k-1)/2):n in [1..coeffs]]; end if;   // precompute normalization factors here
+        if not ap_only then 
+            if not Eisenstein then
+                Z := [(CC!n)^((k-1)/2):n in [1..coeffs]]; 
+            else
+                // in the Eisenstein case, the a_n are of size n^{k-1} so we need to divide by n^{k-1} to get the correct normalization
+                Z := [(CC!n)^(k-1):n in [1..coeffs]];
+            end if;
+        end if;   // precompute normalization factors here
         for i := 1 to #dims do
             if DegreeBound gt 0 and dims[i] gt DegreeBound then
                 printf "Skipping form %o:%o:%o:%o because its dimension %o exceeds the specified degree bound %o.\n",N,k,o,i,dims[i],DegreeBound;
@@ -1720,6 +1727,10 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 assert #a ge coeffs;
                 assert d eq Degree(K);
                 xi := CharacterFromValues(N,r[17][i][1],[K|z:z in r[17][i][2]]);
+                if Eisentein then
+                    xi1 := CharacterFromValues(N,r[22][1][i][1],[K|z:z in r[22][1][i][2]]);
+                    xi2 := CharacterFromValues(N,r[22][2][i][1],[K|z:z in r[22][2][i][2]]);
+                end if;
                 // use more precision here, we need to be sure to separate conjugates
                 E := d gt 1 select LabelEmbeddings(a,ConreyConjugates(chi,xi:ConreyIndexList:=L):Precision:=Max(prec,100)) else [[L[1],1]];
                 root := d gt 1 select Conjugates(Parent(a[1]).1:Precision:=prec) else [CC!0];
@@ -1728,6 +1739,10 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 else
                     A := [Conjugates(a[n]:Precision:=prec) : n in [1..coeffs]];
                     C := [Conjugates(xi(p):Precision:=prec) : p in P];
+                    if Eisenstein then
+                        C1 := [Conjugates(xi1(p):Precision:=prec) : p in P];
+                        C2 := [Conjugates(xi2(p):Precision:=prec) : p in P];
+                    end if;
                 end if;
                 Edual := E;
                 if r[18][i] ne 1 then
@@ -1748,6 +1763,14 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 assert #r[19][i-off2][1] ge #P;
                 cchi := [ComplexConreyCharacter(N,j,CC):j in L];
                 cchi := &cat[[cchi[j]:i in [1..rd]]:j in [1..cd]];
+                if Eisenstein then
+                    L1 := ConreyTable[r[22][1]][1];
+                    L2 := ConreyTable[r[22][2]][2];
+                    cchi1 := [ComplexConreyCharacter(N,j,CC):j in L1];
+                    cchi2 := [ComplexConreyCharacter(N,j,CC):j in L2];
+                    cchi1 := &cat[[cchi1[j]:i in [1..rd]]:j in [1..cd]];
+                    cchi2 := &cat[[cchi2[j]:i in [1..rd]]:j in [1..cd]];
+                end if;
                 A := [[CC|a : a in anlist_from_aplist(N,k,cchi[m],[CC!r[19][i-off2][m][j]:j in [1..#P]],coeffs:FactorTable:=Q)] : m in [1..d]];
                 if o eq 1 then 
                     // For backward compatibility, when chi is trivial we do not assume the embeddings are sorted and sort them if necessary
@@ -1758,6 +1781,10 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 else
                     A := [[CC|A[m][n]:m in [1..d]] : n in [1..coeffs]];                 // transpose to match NF conjugates (as above)
                     C := [[cchi[m](p):m in [1..d]]: p in P];
+                    if Eisenstein then
+                        C1 := [[cchi1[m](p):m in [1..d]]: p in P];
+                        C2 := [[cchi2[m](p):m in [1..d]]: p in P];
+                    end if;
                 end if;
                 Edual := E;
                 if r[18][i] ne 1 then
@@ -1801,8 +1828,12 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                     // str := bracket(strip(Sprintf("%o:%o:%o:%o:%o:%o",rec["label"],rec["hecke_orbit_code"],e[1],e[2],rec["embedding_m"],ap)));
                 else
                     // normalize an here
-                    rec["an_normalized"] := curly(sprint([[sprintreal(Real(A[n][m]/Z[n]),Precision),sprintreal(Imaginary(A[n][m]/n^((k-1)/2)),Precision)] : n in [1..coeffs]]));
-                    rec["angles"] := curly(sprint([(GCD(N,p) eq 1 select sprintreal(SatakeAngle(A[p][m],C[j][m],p,k,pi:nmax:=nmax),Precision) else "null") where p:=P[j] : j in [1..#P]]));
+                    rec["an_normalized"] := curly(sprint([[sprintreal(Real(A[n][m]/Z[n]),Precision),sprintreal(Imaginary(A[n][m]/Z[n]),Precision)] : n in [1..coeffs]]));
+                    if Eisenstein then
+                        rec["angles"] := curly(sprint([(GCD(N,p) eq 1 select sprintreal(C1[j][m],Precision)+","+sprintreal(C2[j][m],Precision) else "null") where p:=P[j] : j in [1..#P]]));
+                    else
+                        rec["angles"] := curly(sprint([(GCD(N,p) eq 1 select sprintreal(SatakeAngle(A[p][m],C[j][m],p,k,pi:nmax:=nmax),Precision) else "null") where p:=P[j] : j in [1..#P]]));
+                    end if;
                     s1 := Set([x:x in Keys(rec)]);  s2 := Set([t[1]: t in hecke_cc_columns]);
                     if s1 ne s2 then error Sprintf("hecke_cc_columns match error diffs %o and %o", s1 diff s2, s2 diff s1); end if;
                     // str := bracket(Join([sprint(rec[t[1]]):t in hecke_cc_columns],":"));

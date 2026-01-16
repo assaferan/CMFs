@@ -1727,7 +1727,7 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 assert #a ge coeffs;
                 assert d eq Degree(K);
                 xi := CharacterFromValues(N,r[17][i][1],[K|z:z in r[17][i][2]]);
-                if Eisentein then
+                if Eisenstein then
                     xi1 := CharacterFromValues(N,r[22][1][i][1],[K|z:z in r[22][1][i][2]]);
                     xi2 := CharacterFromValues(N,r[22][2][i][1],[K|z:z in r[22][2][i][2]]);
                 end if;

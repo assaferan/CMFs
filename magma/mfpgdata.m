@@ -1090,18 +1090,15 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             end if;
             ro := IsDefined(RelatedObjects,label) select RelatedObjects[label] else [Parent("")|];
             if k eq 2 and o eq 1 and dim eq 1 and not Eisenstein then Append(~ro, Sprintf("\"EllipticCurve/Q/%o/%o\"",N,Base26Encode(n-1))); end if;
-            sato_tate_group := [];
             if Eisenstein then
                 assert #r ge 22;
                 for char_label in r[22][n] do
                     c_char, o_char := Explode(Split(char_label, "."));
                     Append(~ro, Sprintf("\"Character/Dirichlet/%o/%o\"", c_char, o_char));
-                    // Sato-Tate group for Eisenstein is finite - the image of (c_char, o_char) inside mu_m x mu_n
-                    Append(~sato_tate_group, SatoTateGroupEisenstein(c_char, o_char));
                 end for;
-                rec["sato_tate_group"] := sato_tate_group;
-            end if;
-            if not Eisenstein then
+                // Sato-Tate group for Eisenstein is finite - the image of (c_char, o_char) inside mu_m x mu_n
+                rec["sato_tate_group"] := SatoTateGroupEisenstein(DirichletCharacter(r[22][n][1]), DirichletCharacter(r[22][n][2]));
+            else
                 if k gt 1 then
                     rec["sato_tate_group"] := rec["is_cm"] eq 1 select Sprintf("%o.2.1.d%o",k-1,Order(chi)) else Sprintf("%o.2.3.c%o",k-1,Order(chi));
                 end if;

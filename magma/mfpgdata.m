@@ -762,6 +762,16 @@ hecke_lpolys_columns := [
 <"p","integer">
 ];
 
+// These are finite groups, so we map to the image of the character pair inside mu_m x mu_n as an abstract group
+function SatoTateGroupEisenstein(chi, psi)
+    N := LCM(Modulus(chi), Modulus(psi));
+    D := FullDirichletGroup(N);
+    A, A_to_D := AbelianGroup(D);
+    G := sub<A | [chi@@A_to_D, psi@@A_to_D]>;
+    N, i := Explode(IdentifyGroup(G));
+    return Sprintf("%o.%o", N, i);
+end function;
+
 
 /*
  Format of infile is N:k:i:t:D:T:A:F:C:E:cm:tw:pra:zr:mm:h:X:sd:eap:a0_num:a0_denom where
@@ -1079,16 +1089,22 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                 end if;
             end if;
             ro := IsDefined(RelatedObjects,label) select RelatedObjects[label] else [Parent("")|];
-            if k gt 1 then
-                rec["sato_tate_group"] := rec["is_cm"] eq 1 select Sprintf("%o.2.1.d%o",k-1,Order(chi)) else Sprintf("%o.2.3.c%o",k-1,Order(chi));
-            end if;
             if k eq 2 and o eq 1 and dim eq 1 and not Eisenstein then Append(~ro, Sprintf("\"EllipticCurve/Q/%o/%o\"",N,Base26Encode(n-1))); end if;
+            sato_tate_group := [];
             if Eisenstein then
                 assert #r ge 22;
                 for char_label in r[22][n] do
                     c_char, o_char := Explode(Split(char_label, "."));
                     Append(~ro, Sprintf("\"Character/Dirichlet/%o/%o\"", c_char, o_char));
+                    // Sato-Tate group for Eisenstein is finite - the image of (c_char, o_char) inside mu_m x mu_n
+                    Append(~sato_tate_group, SatoTateGroupEisenstein(c_char, o_char));
                 end for;
+                rec["sato_tate_group"] := sato_tate_group;
+            end if;
+            if not Eisenstein then
+                if k gt 1 then
+                    rec["sato_tate_group"] := rec["is_cm"] eq 1 select Sprintf("%o.2.1.d%o",k-1,Order(chi)) else Sprintf("%o.2.3.c%o",k-1,Order(chi));
+                end if;
             end if;
             ero := [];
             if IsDefined(ArtinTable,label) then

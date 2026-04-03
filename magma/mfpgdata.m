@@ -474,7 +474,7 @@ procedure FormatNewspaceData (infile, newspace_outfile, gamma1_outfile, trace_ou
             else
                 rec["trace_bound"] := trace_bound;
             end if;
-            if k gt 1 and o eq 1 and #dims gt 0 then
+            if k gt 1 and o eq 1 and IsEven(k) then // and #dims gt 0 then
                 /*
                 AL_signs := eval(r[7]);
                 assert #AL_signs eq #dims;
@@ -768,7 +768,11 @@ function SatoTateGroupEisenstein(chi, psi)
     D := FullDirichletGroup(N);
     A, A_to_D := AbelianGroup(D);
     G := sub<A | [chi@@A_to_D, psi@@A_to_D]>;
-    N, i := Explode(IdentifyGroup(G));
+    if #G ne 512 then
+        N, i := Explode(IdentifyGroup(G));
+    else
+        return "Group of order 512";
+    end if;
     return Sprintf("%o.%o", N, i);
 end function;
 
@@ -863,7 +867,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
     MinimalTwistTable := AssociativeArray();  start := Cputime();
     if minimal_twists ne "" then 
         // b,S := ReadTest("mftwists_minimal.txt");  // format is source:target
-         b,S := ReadTest(minimal_twists); 
+        b,S := ReadTest(minimal_twists); 
         if b then
             for s in Split(S) do r:=Split(s,":"); MinimalTwistTable[r[2]] := r[1]; end for;
             printf "Loaded %o records from %o in %o secs.\n", minimal_twists, #Keys(MinimalTwistTable), Cputime()-start;

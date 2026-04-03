@@ -771,6 +771,7 @@ function SatoTateGroupEisenstein(chi, psi)
     if #G ne 512 then
         N, i := Explode(IdentifyGroup(G));
     else
+        // !!! TODO - replace this by small hash of the group in gps_smallhash
         return "Group of order 512";
     end if;
     return Sprintf("%o.%o", N, i);

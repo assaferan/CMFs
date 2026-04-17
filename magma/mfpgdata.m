@@ -1748,10 +1748,27 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 if Eisenstein then
                     xi1 := DirichletCharacter(r[22][1][1]);// CharacterFromValues(N,r[22][1][i][1],[K|z:z in r[22][1][i][2]]);
                     xi2 := DirichletCharacter(r[22][1][2]);// CharacterFromValues(N,r[22][2][i][1],[K|z:z in r[22][2][i][2]]);
-                    assert IsSubfield(Codomain(xi1), K);
-                    assert IsSubfield(Codomain(xi2), K);
-                    xi1 := CharacterFromValues(Modulus(xi1), [Integers() |u : u in UnitGenerators(xi1)], [K|v : v in ValuesOnUnitGenerators(xi1)]);
-                    xi2 := CharacterFromValues(Modulus(xi2), [Integers() |u : u in UnitGenerators(xi2)], [K|v : v in ValuesOnUnitGenerators(xi2)]);
+                    // assert IsSubfield(Codomain(xi1), K);
+                    // assert IsSubfield(Codomain(xi2), K);
+                    embed1, root1 := HasRoot(DefiningPolynomial(Codomain(xi1)), K);
+                    embed2, root2 := HasRoot(DefiningPolynomial(Codomain(xi2)), K);
+                    // Problem - these do not always embed !!!??
+                    // need to fix this...
+                    // maybe we should just use the character field and not the number field?
+                    // or maybe we should use the character field and then embed the number field?
+                    assert embed1 and embed2;
+                    if Type(Codomain(xi1)) eq FldRat then
+                        emb1 := hom<Codomain(xi1)->K|>;
+                    else
+                        emb1 := hom<Codomain(xi1)->K|root1>;
+                    end if;
+                    if Type(Codomain(xi2)) eq FldRat then
+                        emb2 := hom<Codomain(xi2)->K|>;
+                    else
+                        emb2 := hom<Codomain(xi2)->K|root2>;
+                    end if;
+                    xi1 := CharacterFromValues(Modulus(xi1), [Integers() |u : u in UnitGenerators(xi1)], [K | emb1(v) : v in ValuesOnUnitGenerators(xi1)]);
+                    xi2 := CharacterFromValues(Modulus(xi2), [Integers() |u : u in UnitGenerators(xi2)], [K | emb2(v) : v in ValuesOnUnitGenerators(xi2)]);
                 end if;
                 // use more precision here, we need to be sure to separate conjugates
                 E := d gt 1 select LabelEmbeddings(a,ConreyConjugates(chi,xi:ConreyIndexList:=L):Precision:=Max(prec,100)) else [[L[1],1]];

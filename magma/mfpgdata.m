@@ -1668,7 +1668,7 @@ hecke_cc_columns := [
 procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBound:=0, Detail:=0, 
                             Jobs:=1, JobId:=0, conrey_labels:= "", ap_only:=false, SplitInput:=false, Eisenstein := false)
     assert Jobs gt 0 and JobId ge 0 and JobId lt Jobs;
-    if Eisenstein then assert ap_only; end if; 
+    // if Eisenstein then assert ap_only; end if; 
     // for Eisenstein it makes no sense to compute Satake angles from the traces, as they are not symmetric, 
     // and have different sizes. At the moment, we simply do not compute them.
     if Jobs ne 1 then outfile cat:= Sprintf("_%o",JobId); end if;
@@ -1746,8 +1746,12 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 assert d eq Degree(K);
                 xi := CharacterFromValues(N,r[17][i][1],[K|z:z in r[17][i][2]]);
                 if Eisenstein then
-                    xi1 := CharacterFromValues(N,r[22][1][i][1],[K|z:z in r[22][1][i][2]]);
-                    xi2 := CharacterFromValues(N,r[22][2][i][1],[K|z:z in r[22][2][i][2]]);
+                    xi1 := DirichletCharacter(r[22][1][1]);// CharacterFromValues(N,r[22][1][i][1],[K|z:z in r[22][1][i][2]]);
+                    xi2 := DirichletCharacter(r[22][1][2]);// CharacterFromValues(N,r[22][2][i][1],[K|z:z in r[22][2][i][2]]);
+                    assert IsSubfield(Codomain(xi1), K);
+                    assert IsSubfield(Codomain(xi2), K);
+                    xi1 := CharacterFromValues(Modulus(xi1), [Integers() |u : u in UnitGenerators(xi1)], [K|v : v in ValuesOnUnitGenerators(xi1)]);
+                    xi2 := CharacterFromValues(Modulus(xi2), [Integers() |u : u in UnitGenerators(xi2)], [K|v : v in ValuesOnUnitGenerators(xi2)]);
                 end if;
                 // use more precision here, we need to be sure to separate conjugates
                 E := d gt 1 select LabelEmbeddings(a,ConreyConjugates(chi,xi:ConreyIndexList:=L):Precision:=Max(prec,100)) else [[L[1],1]];
@@ -1848,7 +1852,12 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                     // normalize an here
                     rec["an_normalized"] := curly(sprint([[sprintreal(Real(A[n][m]/Z[n]),Precision),sprintreal(Imaginary(A[n][m]/Z[n]),Precision)] : n in [1..coeffs]]));
                     if Eisenstein then
-                        rec["angles"] := curly(sprint([(GCD(N,p) eq 1 select sprintreal(C1[j][m],Precision)+","+sprintreal(C2[j][m],Precision) else "null") where p:=P[j] : j in [1..#P]]));
+                        function my_angle(z, CC)
+                            // assuming z lies on the unit circle, return the angle theta in [0,2 pi] such that z = exp(i theta)
+                            if z eq -1 then return Real(Pi(CC)); end if; // return 0.5; end if; 
+                            return Im(Log(z)); //Log(z)/(2*Pi(CC)*CC.1); 
+                        end function;
+                        rec["angles"] := curly(sprint([(GCD(N,p) eq 1 select sprintreal(my_angle(C1[j][m],CC),Precision) cat "," cat sprintreal(my_angle(C2[j][m],CC),Precision) else "null") where p:=P[j] : j in [1..#P]]));
                     else
                         rec["angles"] := curly(sprint([(GCD(N,p) eq 1 select sprintreal(SatakeAngle(A[p][m],C[j][m],p,k,pi:nmax:=nmax),Precision) else "null") where p:=P[j] : j in [1..#P]]));
                     end if;

@@ -1748,8 +1748,11 @@ procedure FormatHeckeCCData (infile, outfile: Coeffs:=0, Precision:=20, DegreeBo
                 if Eisenstein then
                     xi1 := DirichletCharacter(r[22][1][1]);// CharacterFromValues(N,r[22][1][i][1],[K|z:z in r[22][1][i][2]]);
                     xi2 := DirichletCharacter(r[22][1][2]);// CharacterFromValues(N,r[22][2][i][1],[K|z:z in r[22][2][i][2]]);
-                    // assert IsSubfield(Codomain(xi1), K);
-                    // assert IsSubfield(Codomain(xi2), K);
+                   
+                    K := Compositum(K, Codomain(xi1));
+                    K := Compositum(K, Codomain(xi2));
+                    assert IsSubfield(Codomain(xi1),K) and IsSubfield(Codomain(xi2),K);
+
                     embed1, root1 := HasRoot(DefiningPolynomial(Codomain(xi1)), K);
                     embed2, root2 := HasRoot(DefiningPolynomial(Codomain(xi2)), K);
                     // Problem - these do not always embed !!!??

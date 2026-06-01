@@ -318,8 +318,8 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
     end if;
     D := [D[T[i][2]] : i in [1..#T]];  S := [S[T[i][2]] : i in [1..#T]];  F := [*F[T[i][2]] : i in [1.. #T]*]; 
     if Eisenstein then 
-        F0 := [*F0[T[i][2]] : i in [1.. #T]*]; 
-        char_pairs := [*char_pairs[T[i][2]] : i in [1..#T]*];
+        F0 := [*F0[T0[i][2]] : i in [1.. #T0]*]; 
+        char_pairs := [*char_pairs[T0[i][2]] : i in [1..#T0]*];
         a0 := [ Parent(a) eq Rationals() select a else AbsoluteTrace(a) where a:=Coefficient(F0[i],0) : i in [1..#F0] ];
         a0_nums := [Numerator(x) : x in a0];
         a0_denoms := [Denominator(x) : x in a0];

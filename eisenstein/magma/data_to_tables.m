@@ -93,7 +93,7 @@ procedure DoEverythingNk2UpTo(B : folder := "../data/", do_conrey := false)
     CreateDimensionTableTwo(dimfile, B);
     FormatNewspaceData(infile, newspace_outfile, gamma1_outfile, trace_outfile, dimfile : conrey_labels := conrey_labels, Eisenstein);
     FormatNewformData(infile, outfile_prefix, suffix : conrey_labels := conrey_labels, Eisenstein);
-    FormatHeckeCCData(infile, outfile_hecke_cc : ap_only, Eisenstein, conrey_labels := conrey_labels);
+    FormatHeckeCCData(infile, outfile_hecke_cc : Eisenstein, conrey_labels := conrey_labels);
     return;
 end procedure;
 

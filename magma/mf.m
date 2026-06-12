@@ -370,7 +370,7 @@ function NewspaceData (chi, k, o: CharTable:=AssociativeArray(), TraceHint:=[], 
             if D[i] gt DegreeBound then break; end if;
             if Detail gt 0 then printf "Computing %o exact Hecke eigenvalues form %o:%o:%o:%o of dimension %o...",n,N,k,o,i,D[i]; t:=Cputime(); end if;
             K := AbsoluteField(BaseRing(Parent(F[i])));
-            a0 := Eltseq(K!Coefficient(F[i],0)); 
+            a0 := Eisenstein select Eltseq(K!Coefficient(F0[i],0)) else Eltseq(K!Coefficient(F[i],0));
             an := [Eltseq(K!Coefficient(F[i],j)) : j in [1..n]];
             f := Eltseq(MinimalPolynomial(K.1));
             f,b,a,c,d,pr,m,a0 := OptimizedOrderBasis(f,an,a0 :Verbose:=Detail gt 0);

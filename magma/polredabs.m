@@ -34,7 +34,7 @@ intrinsic PerfectPowerBase(n::RngIntElt) -> RngIntElt
     if n lt 2 then return n; end if;
     b,m := IsPower(n);
     return b select m else n;
-end intrinsic
+end intrinsic;
 
 intrinsic IsPolredabsCandidate (f::RngUPolElt) -> BoolElt
 { Returns true if the polynomial looks like Polredabs can easily handle it. }

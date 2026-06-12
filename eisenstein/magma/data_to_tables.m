@@ -1,5 +1,5 @@
 import "../../magma/mfpgdata.m" : newspaces_columns, gamma1_columns, hecke_traces_columns, 
-                                  newforms_columns, hecke_nf_columns, hecke_lpolys_columns, 
+                                  newforms_columns, hecke_nf_columns, hecke_lpolys_columns, hecke_charpolys_columns,
                                   twists_nf_columns, twists_cc_columns, hecke_cc_columns, char_dir_orbits_columns;
 
 import "../../magma/mfpgdata.m" : FormatNewspaceData, CreateDimensionTableTwo, 
@@ -144,7 +144,7 @@ end procedure;
 */
 
 procedure DataToTables(infile, dimfile, outfile_prefix)
-    suffixes := ["newspaces", "gamma1", "hecke_traces", "newforms", "hecke_nf", "hecke_lpolys", 
+    suffixes := ["newspaces", "gamma1", "hecke_traces", "newforms", "hecke_nf", "hecke_lpolys", "hecke_charpolys",
                  "twists_nf", "twists_cc", "hecke_cc", "char_dir_orbits"];
     outfiles := AssociativeArray();
     columns := AssociativeArray();

@@ -39,6 +39,32 @@ function LPolyFactorization(L)
                 func<a,b|Degree(a[1]) ne Degree(b[1]) select Degree(a[1])-Degree(b[1]) else (a[2] ne b[2] select a[2]-b[2] else (Coefficients(a[1]) le Coefficients(b[1]) select -1 else 1))>);
 end function;
 
+// Primitive integer polynomial representing a monic irreducible factor in Q[x] (for mf_hecke_charpolys export)
+function RationalPolyToPrimitiveZZ(h)
+    R := Parent(h);
+    assert Type(BaseRing(R)) eq FldRat;
+    assert IsMonic(h) and Degree(h) ge 1;
+    den := LCM([Denominator(c): c in Coefficients(h)]);
+    ZT := PolynomialRing(Integers());
+    hz := ZT!([Integers()!(den*c) : c in Coefficients(h)]);
+    g := 0;
+    for c in Coefficients(hz) do g := Gcd(g, Integers()!c); end for;
+    if g gt 1 then hz := ZT!ExactQuotient(hz, ZT!g); end if;
+    if LeadingCoefficient(hz) lt 0 then hz := -hz; end if;
+    return hz;
+end function;
+
+// Factorization of characteristic polynomial of T_p over Q (monic, degree >= 1); factors as primitive Z[x] pairs
+function CharPolyFactorization(g)
+    g := PolynomialRing(Rationals())!g;
+    assert Type(BaseRing(Parent(g))) eq FldRat;
+    assert IsMonic(g) and Degree(g) ge 1;
+    LL, _ := Factorization(g);
+    facts := [<RationalPolyToPrimitiveZZ(pair[1]), pair[2]> : pair in LL];
+    return Sort(facts,
+                func<a,b|Degree(a[1]) ne Degree(b[1]) select Degree(a[1])-Degree(b[1]) else (a[2] ne b[2] select a[2]-b[2] else (Coefficients(a[1]) le Coefficients(b[1]) select -1 else 1))>);
+end function;
+
 function AnalyticConductor (N, k)
     return N*(Exp(Psi(k/2))/(2*Pi(RealField())))^2;
 end function;
@@ -762,6 +788,12 @@ hecke_lpolys_columns := [
 <"p","integer">
 ];
 
+hecke_charpolys_columns := [
+<"hecke_orbit_code","bigint">,
+<"p","integer">,
+<"charpoly_factorization","jsonb">
+];
+
 // These are finite groups, so we map to the image of the character pair inside mu_m x mu_n as an abstract group
 function SatoTateGroupEisenstein(chi, psi)
     N := LCM(Modulus(chi), Modulus(psi));
@@ -823,6 +855,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
     hecke_outfile := outfile_prefix cat "mf_hecke_nf_" cat outfile_suffix;
     trace_outfile := outfile_prefix cat "mf_hecke_traces_" cat outfile_suffix;
     lpoly_outfile := outfile_prefix cat "mf_hecke_lpolys_" cat outfile_suffix;
+    charpoly_outfile := outfile_prefix cat "mf_hecke_charpolys_" cat outfile_suffix;
     ConreyTable:=AssociativeArray();
     if conrey_labels ne "" then
         start:=Cputime();
@@ -892,15 +925,17 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
     hecke_fp := Open(hecke_outfile,"w");
     trace_fp := Open(trace_outfile,"w");
     lpoly_fp := Open(lpoly_outfile,"w");
+    charpoly_fp := Open(charpoly_outfile,"w");
     if JobId eq 0 then
         write_header (Jobs gt 1 select "mf_newforms_header.txt" else "", newform_fp, newforms_columns);
         write_header (Jobs gt 1 select "mf_hecke_nf_header.txt" else "", hecke_fp, hecke_nf_columns);
         write_header (Jobs gt 1 select "mf_hecke_traces_header.txt" else "", trace_fp, hecke_traces_columns);
         write_header (Jobs gt 1 select "mf_hecke_lpolys_header.txt" else "", lpoly_fp, hecke_lpolys_columns);
+        write_header (Jobs gt 1 select "mf_hecke_charpolys_header.txt" else "", charpoly_fp, hecke_charpolys_columns);
     end if;
     OT := AssociativeArray();
     unknown_fields := {};
-    cnt := 0; trcnt := 0; hnfcnt := 0; lpcnt := 0; unknown_cnt := 0;
+    cnt := 0; trcnt := 0; hnfcnt := 0; lpcnt := 0; charpcnt := 0; unknown_cnt := 0;
     rec := AssociativeArray();
     rechnf := AssociativeArray();
     RCP := AssociativeArray();  RCPI := AssociativeArray();
@@ -1245,12 +1280,16 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                 P := PrimesInInterval(1,#tr);
                 rechnf["ap"] := sprint([[tr[p]] : p in P]);
                 rechnf["maxp"] := P[#P];
+                RQ := PolynomialRing(Rationals());
                 for p in LPP do
                     lpoly := RT![1,-tr[p],(Integers()!chi(p))*p^(k-1)];
                     factored_lpoly := [[sprint(Eltseq(a[1])),sprint(a[2])]:a in LPolyFactorization(lpoly)];
                     Puts(lpoly_fp,Sprintf("%o:%o:%o:%o",code,curly(sprint(Eltseq(lpoly))),sprint(factored_lpoly),p));
+                    gch := RQ![Rationals()!(-tr[p]), Rationals()!1];
+                    factored_ch := [[sprint(Eltseq(t[1])),sprint(t[2])]:t in CharPolyFactorization(gch)];
+                    Puts(charpoly_fp,Sprintf("%o:%o:%o",code,p,sprint(factored_ch)));
                 end for;
-                lpcnt +:= #LPP; Flush(lpoly_fp);
+                lpcnt +:= #LPP; charpcnt +:= #LPP; Flush(lpoly_fp); Flush(charpoly_fp);
             end if;
             if n gt m and n le m+#r[10] then
                 nn := n-m;
@@ -1296,12 +1335,16 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                     rec["qexp_display"] := qExpansionStringOverNF([densify(z,zzn):z in an],MIN_QEXP_DIGITS,MAX_QEXP_DIGITS,zzn,0 : 
                                                                   a0num := densify(r[10][nn][8],zzn), a0denom := r[10][nn][9]);
                     KR:=PolynomialRing(K);
+                    RQ := PolynomialRing(Rationals());
                     for p in LPP do
                         lpoly := RT!Norm(KR!1 - a[p]*KR.1 + xi(p)*p^(k-1)*KR.1^2);
                         factored_lpoly := [[sprint(Eltseq(a[1])),sprint(a[2])]:a in LPolyFactorization(lpoly)];
                         Puts(lpoly_fp,Sprintf("%o:%o:%o:%o",code,curly(sprint(Eltseq(lpoly))),sprint(factored_lpoly),p));
+                        gch := RQ!CharacteristicPolynomial(a[p], Rationals());
+                        factored_ch := [[sprint(Eltseq(t[1])),sprint(t[2])]:t in CharPolyFactorization(gch)];
+                        Puts(charpoly_fp,Sprintf("%o:%o:%o",code,p,sprint(factored_ch)));
                     end for;
-                    lpcnt +:=#LPP; Flush(lpoly_fp);
+                    lpcnt +:=#LPP; charpcnt +:= #LPP; Flush(lpoly_fp); Flush(charpoly_fp);
                 else
                     rechnf["hecke_ring_power_basis"] := (dens eq [1:i in [1..dim]] and nums eq [[i eq j select 1 else 0:i in [1..dim]]:j in [1..dim]]) select 1 else 0;
                     rechnf["hecke_ring_cyclotomic_generator"] := 0;
@@ -1329,12 +1372,16 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
                     K := Universe(a);
                     xi := CharacterFromValues(N,r[17][n][1],[K|x : x in r[17][n][2]]);
                     KR:=PolynomialRing(K);
+                    RQ := PolynomialRing(Rationals());
                     for p in LPP do
                         lpoly := RT!Norm(KR!1 - a[p]*KR.1 + xi(p)*p^(k-1)*KR.1^2);
                         factored_lpoly := [[sprint(Eltseq(a[1])),sprint(a[2])]:a in LPolyFactorization(lpoly)];
                         Puts(lpoly_fp,Sprintf("%o:%o:%o:%o",code,curly(sprint(Eltseq(lpoly))),sprint(factored_lpoly),p));
+                        gch := RQ!CharacteristicPolynomial(a[p], Rationals());
+                        factored_ch := [[sprint(Eltseq(t[1])),sprint(t[2])]:t in CharPolyFactorization(gch)];
+                        Puts(charpoly_fp,Sprintf("%o:%o:%o",code,p,sprint(factored_ch)));
                     end for;
-                    lpcnt +:=#LPP; Flush(lpoly_fp);
+                    lpcnt +:=#LPP; charpcnt +:= #LPP; Flush(lpoly_fp); Flush(charpoly_fp);
                 end if;
             end if;
             rec["trace_a0_num"] := r[20][n];
@@ -1354,7 +1401,7 @@ procedure FormatNewformData (infile, outfile_prefix, outfile_suffix: Detail:=0, 
             cnt +:= 1;
         end for;
     end for;
-    printf "Wrote %o records to %o, and %o records to %o, and %o records to file %o, and %o records to file %o, total time %.3o secs\n", cnt, newform_outfile, hnfcnt, hecke_outfile, trcnt, trace_outfile, lpcnt, lpoly_outfile, Cputime()-start;
+    printf "Wrote %o records to %o, and %o records to %o, and %o records to file %o, and %o records to file %o, and %o records to file %o, total time %.3o secs\n", cnt, newform_outfile, hnfcnt, hecke_outfile, trcnt, trace_outfile, lpcnt, lpoly_outfile, charpcnt, charpoly_outfile, Cputime()-start;
     if unknown_cnt gt 0 then printf "Appended %o unknown polredabs field polys to unknown_fields.txt\n", unknown_cnt; end if;
 end procedure;
 

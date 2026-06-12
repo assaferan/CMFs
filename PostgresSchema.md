@@ -367,9 +367,10 @@ trace_an | numeric | trace of a_n down to Z
 Column | Type | Notes
 -------|------|------
 hecke_orbit_code | bigint | encoding of the tuple (N.k.a.x) into 64 bits
-p | integer | prime identifying L-poly L_p(T) = prod_(sigma in Gal(Q(f)/Q) (1 - sigma(a_p(f))T + chi(p)p^(k-1)T^2))
-charpoly_factorization | jsonb | list consisting of a single pair [fac,e] where fac is a list of coefficients of the minpoly and e is [Q(f):Q(a_p)]
+p | integer | prime
+charpoly_factorization | jsonb | factorization over `\mathbb{Q}` of the characteristic polynomial of `T_p` on the Galois-stable newform subspace (same primes as `mf_hecke_lpolys` in CMFs `FormatNewformData`, typically `p \le 100`)
 
+Flat file: `mf_hecke_charpolys_<suffix>.m.txt` (colon-separated, produced alongside `mf_hecke_lpolys_<suffix>.m.txt` by `FormatNewformData` in `mfpgdata.m`).
 
 **Table** `mf_hecke_newspace_traces`:
 

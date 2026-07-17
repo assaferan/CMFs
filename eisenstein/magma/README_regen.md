@@ -44,7 +44,7 @@ Notes:
   (e.g. `7.3.E.d.a`: `a0_num={-1,1}`, `Tr = -1 = trace_a0_num`); `qexp_display` shows the constant term.
 - Parallel (`NJOBS=4`) vs serial output: **all tables byte-identical** (infile identical modulo the per-space timing field).
 
-## Loading the results (for your colleague)
+## Loading the results
 
 The output `Nk2_mf_*_<B>.m.txt` files are colon-separated with a 2-line header
 (column names, then Postgres types), matching the existing `mf_*_eis` tables:

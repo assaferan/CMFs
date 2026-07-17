@@ -20,3 +20,7 @@ gp
 
 # data files
 eisenstein/data
+
+# Magma run artifacts (from eisenstein/magma/run_parallel.sh)
+eisenstein/magma/logs
+unknown_fields.txt
